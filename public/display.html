@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Display</title>
+  <link href="https://vjs.zencdn.net/8.5.2/video-js.css" rel="stylesheet" />
+  <style>
+    html, body { margin:0; padding:0; width:100vw; height:100vh; overflow:hidden; background:black; }
+    .video-js { position:absolute; top:0; left:0; width:100%!important; height:100%!important; }
+    .video-js .vjs-tech { object-fit: fill!important; width:100%!important; height:100%!important; }
+  </style>
+</head>
+<body>
+  <video id="slaveVideo" class="video-js vjs-default-skin" autoplay muted preload="auto"></video>
+  <script src="https://vjs.zencdn.net/8.5.2/video.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/display.js"></script>
+</body>
+</html>
