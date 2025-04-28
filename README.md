@@ -8,6 +8,7 @@ SyncVid is a lightweight Node.js application designed to synchronize and display
 <p align="center">
   <video src="https://github.com/J8-Diablo/SyncVid-for-Minecraft-and-other/blob/main/demo/Demo.mp4" width="450" controls></video>
 </p>
+
 ## Features
 - **Easy Setup**: Clone the repository and install dependencies with a single command.
 - **Web-based Control**: Access a control panel to manage video playback.
