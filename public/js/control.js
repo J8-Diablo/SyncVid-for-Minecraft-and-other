@@ -5,6 +5,7 @@ let nextDisplayId = 1;
 const frames = {};
 const frameBackup = {};
 const defaultFrame = { x:0, y:0, width:50, height:50 };
+const volumes = {};
 
 document.addEventListener('DOMContentLoaded', () => {
   masterPlayer = videojs('masterVideo', { fluid: false });
@@ -82,6 +83,32 @@ function renderDisplayList() {
     const span = document.createElement('span');
     span.textContent = `Display ${id}`;
     li.appendChild(span);
+
+     // Mute label
+     const lblMute = document.createElement('span');
+     lblMute.textContent = 'Mute';
+     lblMute.classList.add('ms-2');
+     li.appendChild(lblMute);
+ 
+     // Mute checkbox
+     const chkMute = document.createElement('input');
+     chkMute.type = 'checkbox';
+     chkMute.checked = true;
+     chkMute.classList.add('ms-2');
+     chkMute.addEventListener('change', () => toggleMute(id, chkMute.checked, sliderVolume));
+     li.appendChild(chkMute);
+ 
+     // Volume slider
+     const sliderVolume = document.createElement('input');
+     sliderVolume.type = 'range';
+     sliderVolume.min = 0; sliderVolume.max = 1;
+     sliderVolume.step = 0.01;
+     sliderVolume.value = 1;
+     sliderVolume.style.width = '100px';
+     sliderVolume.classList.add('ms-2');
+     sliderVolume.style.display = 'none';
+     sliderVolume.addEventListener('input', () => changeVolume(id, sliderVolume.value));
+     li.appendChild(sliderVolume);
 
     // Boutons Reset & Delete
     const btnGroup = document.createElement('div');
@@ -166,6 +193,28 @@ function resizeListener(event) {
   el.style.left = `${xPct}%`; el.style.top = `${yPct}%`;
   el.style.width = `${wPct}%`; el.style.height = `${hPct}%`;
   sendFrameUpdate(el);
+}
+
+function toggleMute(id, muted, slider) {
+  console.log(`Display ${id} muted: ${muted}`);
+  slider.style.display = muted ? 'none' : 'inline-block';
+  socket.emit('controlEvent', { type: 'mute', muted, id });
+}
+
+function changeVolume(id, volume) {
+  volumes[id] = volume;
+  console.log(`Display ${id} volume: ${volume}`);
+
+  socket.emit('controlEvent', { type: 'volume', volume, id });
+}
+
+function sendSoundUpdate(el) {
+  const id = parseInt(el.dataset.id, 10);
+  socket.emit('displayVolume', {
+    id,
+    volume: parseFloat(el.style.volume),
+    state: parseFloat(el.style.state),
+  });
 }
 
 function sendFrameUpdate(el) {

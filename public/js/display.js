@@ -7,7 +7,7 @@ window.addEventListener('DOMContentLoaded', () => {
   socket.emit('registerDisplay', { id: displayId, width: window.innerWidth, height: window.innerHeight });
 });
 
-socket.on('controlEvent', ({ type, src, time }) => {
+socket.on('controlEvent', ({ type, src, time, muted, volume,id }) => {
   if (type === 'load') {
     slavePlayer.src({ type:'video/webm', src });
     slavePlayer.ready(() => { slavePlayer.currentTime(0); slavePlayer.play(); });
@@ -17,8 +17,19 @@ socket.on('controlEvent', ({ type, src, time }) => {
     slavePlayer.pause();
   } else if (type === 'seek') {
     slavePlayer.currentTime(time);
+  } else if (type === 'volume') {
+    const int_id = parseInt(id, 10);
+    if (int_id !== displayId) return;
+    slavePlayer.volume(volume);
+  } else if (type === 'mute') {
+    const int_id = parseInt(id, 10);
+    if (int_id !== displayId) return;
+    slavePlayer.muted(muted);
   }
 });
+
+
+
 
 socket.on('frameUpdate', ({ id, x, y, width, height }) => {
   const int_id = parseInt(id, 10);
