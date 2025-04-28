@@ -51,7 +51,8 @@ SyncVid is a lightweight Node.js application designed to synchronize and display
 ## Roadmap
 
 - **Authentication**: Add login for the control panel.
-- **Unauthenticated** Display Access: Provide a configuration option to enable or disable public (read-only) access to the display page without requiring authentication.
+- **Unauthenticated**: Display Access: Provide a configuration option to enable or disable public (read-only) access to the display page without requiring authentication.
+- **Mp4 to Webm**: Automatic convert when mp4 is uploaded
 
 
 ## License
