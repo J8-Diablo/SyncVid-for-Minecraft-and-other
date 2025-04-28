@@ -3,6 +3,9 @@
 ## Overview
 SyncVid is a lightweight Node.js application designed to synchronize and display videos for Minecraft sessions or other creative setups. It provides a simple web-based control panel to upload, manage, and play videos in sync across multiple clients.
 
+
+## Minecraft Prewiew
+[![Watch the video](https://i9.ytimg.com/vi/FlafJZ1GHUw/mqdefault.jpg?sqp=CIjEvcAG-oaymwEmCMACELQB8quKqQMa8AEB-AH-CYAC0AWKAgwIABABGEsgSChlMA8=&rs=AOn4CLAvQnNe_m_gvnbuo71SQS9_fYikyw)](https://www.youtube.com/watch?v=FlafJZ1GHUw)
 ## Features
 - **Easy Setup**: Clone the repository and install dependencies with a single command.
 - **Web-based Control**: Access a control panel to manage video playback.
