@@ -50,6 +50,16 @@ app.get('/videos/list', (req, res) => {
 app.get('/control', (req, res) => res.sendFile(path.join(__dirname, 'public/control.html')));
 app.get('/display/:id', (req, res) => res.sendFile(path.join(__dirname, 'public/display.html')));
 
+// local translation
+app.get('/locales/:lng/translation.json', (req, res) => {
+  const lng = req.params.lng;
+  const filePath = path.join(__dirname, 'locales', lng, 'translation.json');
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(JSON.parse(data));
+  });
+});
+
 let displays = {};
 let masterTime = 0;
 

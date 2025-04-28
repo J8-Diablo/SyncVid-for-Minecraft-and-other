@@ -10,6 +10,9 @@
     "http": "^0.0.1-security",
     "socket.io": "^4.0.0",
     "multer": "^1.4.3",
-    "video.js": "^8.5.2"
+    "video.js": "^8.5.2",
+    "i18next": "^23.x",
+    "i18next-browser-languagedetector": "^6.x",
+    "serve-static": "^1.x"
   }
 }

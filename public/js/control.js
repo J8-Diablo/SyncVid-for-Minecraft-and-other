@@ -254,3 +254,61 @@ function selectVideo(filename) {
   masterPlayer.src({ type: 'video/webm', src: url }); masterPlayer.play();
   socket.emit('controlEvent', { type: 'load', src: url });
 }
+
+
+
+
+$(document).ready(function() {
+  
+  $('#languageSwitcher').on('change', function() {
+    const selectedLang = $(this).val();
+    
+    // Demander à i18next de changer de langue
+    i18next.changeLanguage(selectedLang, function(err, t) {
+      if (err) {
+        console.error('Erreur lors du changement de langue', err);
+      } else {
+        // Re-traduire tout le DOM
+        $('body').localize();
+
+        // Afficher un message sympa
+        let message = '';
+        switch (selectedLang) {
+          case 'fr':
+            message = 'Langue changée : Français';
+            break;
+          case 'en':
+            message = 'Language changed: English';
+            break;
+          default:
+            message = 'Language changed: ' + selectedLang;
+        }
+
+        console.log(message);
+        showToast(message);
+      }
+    });
+  });
+});
+
+// Affichage toast (optionnel)
+function showToast(message) {
+  const toastHTML = `
+    <div class="toast align-items-center text-white bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true" style="position: absolute; top: 4rem; right: 1rem; z-index: 9999;">
+      <div class="d-flex">
+        <div class="toast-body">
+          ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  `;
+  
+  const $toast = $(toastHTML);
+  $('body').append($toast);
+  const toast = new bootstrap.Toast($toast[0]);
+  toast.show();
+  $toast.on('hidden.bs.toast', function () {
+    $(this).remove();
+  });
+}
