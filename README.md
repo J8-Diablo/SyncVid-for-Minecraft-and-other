@@ -57,7 +57,7 @@ SyncVid is a lightweight Node.js application designed to synchronize and display
 
 ## License
 
-This project is licensed under the [Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/).
+This project is licensed under the [Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 
 You are free to:
 - **Share** — copy and redistribute the material in any medium or format.
