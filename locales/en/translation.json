@@ -3,5 +3,6 @@
     "AddDisplay": "Add Display",
     "videoUpload": "Video Upload",
     "listvideo": "Video List",
-    "displaylist": "Display List"
-  }
+    "displaylist": "Display List",
+    "convert.text": "Uploading in progress, this may take some time"
+}

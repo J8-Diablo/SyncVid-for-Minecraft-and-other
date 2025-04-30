@@ -7,21 +7,39 @@ const frameBackup = {};
 const defaultFrame = { x:0, y:0, width:50, height:50 };
 const volumes = {};
 
+
+// ➤ Variables pour l’upload/conversion
+let isUploading = false;
+let currentClientId = null;
+
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialisation du player
   masterPlayer = videojs('masterVideo', { fluid: false });
   socket.emit('registerControl');
   loadVideoList();
   renderDisplayList();
 
-  masterPlayer.on('play', () => socket.emit('controlEvent', { type: 'play' }));
-  masterPlayer.on('pause', () => socket.emit('controlEvent', { type: 'pause' }));
-  masterPlayer.on('seeked', () => socket.emit('controlEvent', { type: 'seek', time: masterPlayer.currentTime() }));
+  // Synchronisation des événements du player
+  masterPlayer.on('play',           () => socket.emit('controlEvent', { type: 'play' }));
+  masterPlayer.on('pause',          () => socket.emit('controlEvent', { type: 'pause' }));
+  masterPlayer.on('seeked',         () => socket.emit('controlEvent', { type: 'seek', time: masterPlayer.currentTime() }));
   masterPlayer.on('loadedmetadata', () => socket.emit('controlEvent', { type: 'load', src: masterPlayer.currentSrc() }));
 
+  // Boutons UI
   document.getElementById('btnAddDisplay').addEventListener('click', addDisplayFrame);
   document.getElementById('btnUpload').addEventListener('click', () => document.getElementById('fileInput').click());
   document.getElementById('fileInput').addEventListener('change', uploadVideo);
+
+  // Écoute globale des events conversion
+  socket.on('conversionError', data => {
+    if (data.clientId === currentClientId) {
+      showConversionError(data.message);
+    }
+  });
 });
+
+
+// ==== GESTION DES FRAMES D’AFFICHAGE ====
 
 function addDisplayFrame() {
   const id = nextDisplayId++;
@@ -29,16 +47,12 @@ function addDisplayFrame() {
   frame.classList.add('display-frame');
   frame.dataset.id = id;
   frame.textContent = id;
-
-  // Valeurs par défaut
   frame.style.left   = defaultFrame.x + '%';
   frame.style.top    = defaultFrame.y + '%';
   frame.style.width  = defaultFrame.width + '%';
   frame.style.height = defaultFrame.height + '%';
-
   container.appendChild(frame);
   frames[id] = frame;
-
   setupInteractions(frame);
   renderDisplayList();
   sendFrameUpdate(frame);
@@ -66,13 +80,14 @@ function setupInteractions(frame) {
 }
 
 function renderDisplayList() {
-  const ul = document.getElementById('displayList'); ul.innerHTML = '';
+  const ul = document.getElementById('displayList');
+  ul.innerHTML = '';
   Object.keys(frames).forEach(id => {
     const frame = frames[id];
     const li = document.createElement('li');
     li.className = 'list-group-item d-flex justify-content-between align-items-center';
 
-    // Checkbox
+    // Toggle visible
     const chk = document.createElement('input');
     chk.type = 'checkbox';
     chk.checked = frame.style.width !== '0%' && frame.style.height !== '0%';
@@ -84,44 +99,34 @@ function renderDisplayList() {
     span.textContent = `Display ${id}`;
     li.appendChild(span);
 
-     // Mute label
-     const lblMute = document.createElement('span');
-     lblMute.textContent = 'Mute';
-     lblMute.classList.add('ms-2');
-     li.appendChild(lblMute);
- 
-     // Mute checkbox
-     const chkMute = document.createElement('input');
-     chkMute.type = 'checkbox';
-     chkMute.checked = true;
-     chkMute.classList.add('ms-2');
-     chkMute.addEventListener('change', () => toggleMute(id, chkMute.checked, sliderVolume));
-     li.appendChild(chkMute);
- 
-     // Volume slider
-     const sliderVolume = document.createElement('input');
-     sliderVolume.type = 'range';
-     sliderVolume.min = 0; sliderVolume.max = 1;
-     sliderVolume.step = 0.01;
-     sliderVolume.value = 1;
-     sliderVolume.style.width = '100px';
-     sliderVolume.classList.add('ms-2');
-     sliderVolume.style.display = 'none';
-     sliderVolume.addEventListener('input', () => changeVolume(id, sliderVolume.value));
-     li.appendChild(sliderVolume);
+    // Mute & volume
+    const lblMute = document.createElement('span');
+    lblMute.textContent = 'Mute';
+    lblMute.classList.add('ms-2');
+    li.appendChild(lblMute);
 
-    // Boutons Reset & Delete
+    const chkMute = document.createElement('input');
+    chkMute.type = 'checkbox'; chkMute.checked = true; chkMute.classList.add('ms-2');
+    chkMute.addEventListener('change', () => toggleMute(id, chkMute.checked, sliderVolume));
+    li.appendChild(chkMute);
+
+    const sliderVolume = document.createElement('input');
+    sliderVolume.type = 'range'; sliderVolume.min = 0; sliderVolume.max = 1; sliderVolume.step = 0.01;
+    sliderVolume.value = 1; sliderVolume.style.width = '100px'; sliderVolume.classList.add('ms-2');
+    sliderVolume.style.display = 'none';
+    sliderVolume.addEventListener('input', () => changeVolume(id, sliderVolume.value));
+    li.appendChild(sliderVolume);
+
+    // Reset & Delete
     const btnGroup = document.createElement('div');
     const btnReset = document.createElement('button');
     btnReset.className = 'btn btn-sm btn-secondary me-2';
     btnReset.textContent = 'Reset';
     btnReset.addEventListener('click', () => resetDisplay(id));
-
     const btnDelete = document.createElement('button');
     btnDelete.className = 'btn btn-sm btn-danger';
     btnDelete.textContent = 'Delete';
     btnDelete.addEventListener('click', () => deleteDisplay(id));
-
     btnGroup.append(btnReset, btnDelete);
     li.appendChild(btnGroup);
 
@@ -147,7 +152,6 @@ function toggleDisplay(id, visible) {
     };
     frame.style.left = '0%'; frame.style.top = '0%'; frame.style.width = '0%'; frame.style.height = '0%';
   }
-  // Envoi explicite de la mise à jour
   sendFrameUpdate(frame);
 }
 
@@ -163,63 +167,54 @@ function resetDisplay(id) {
 }
 
 function deleteDisplay(id) {
-  const frame = frames[id];
-  frame.remove(); delete frames[id]; delete frameBackup[id];
+  frames[id].remove();
+  delete frames[id];
+  delete frameBackup[id];
   renderDisplayList();
   socket.emit('frameDelete', { id });
 }
 
 function dragMoveListener(event) {
   const el = event.target;
-  const contRect = container.getBoundingClientRect();
-  const leftPx = (parseFloat(el.style.left) / 100) * contRect.width + event.dx;
-  const topPx  = (parseFloat(el.style.top)  / 100) * contRect.height + event.dy;
-  const leftPct = (leftPx / contRect.width) * 100;
-  const topPct  = (topPx  / contRect.height)* 100;
+  const cr = container.getBoundingClientRect();
+  const leftPct = ((parseFloat(el.style.left)/100)*cr.width + event.dx) / cr.width * 100;
+  const topPct  = ((parseFloat(el.style.top)/100)*cr.height + event.dy) / cr.height * 100;
   el.style.left = `${Math.max(0, Math.min(leftPct, 100 - parseFloat(el.style.width)))}%`;
-  el.style.top  = `${Math.max(0, Math.min(topPct,  100 - parseFloat(el.style.height)))}%`;
+  el.style.top  = `${Math.max(0, Math.min(topPct, 100 - parseFloat(el.style.height)))}%`;
   sendFrameUpdate(el);
 }
 
 function resizeListener(event) {
   const el = event.target;
-  const contRect = container.getBoundingClientRect();
+  const cr = container.getBoundingClientRect();
   const r = event.rect;
-  let wPct = (r.width  / contRect.width) * 100;
-  let hPct = (r.height / contRect.height) * 100;
-  let xPct = (r.left    - contRect.left)   / contRect.width  * 100;
-  let yPct = (r.top     - contRect.top)    / contRect.height * 100;
-  wPct = Math.min(wPct, 100 - xPct); hPct = Math.min(hPct, 100 - yPct);
-  el.style.left = `${xPct}%`; el.style.top = `${yPct}%`;
-  el.style.width = `${wPct}%`; el.style.height = `${hPct}%`;
+  let wPct = r.width / cr.width * 100;
+  let hPct = r.height / cr.height * 100;
+  const xPct = (r.left - cr.left) / cr.width * 100;
+  const yPct = (r.top  - cr.top)  / cr.height * 100;
+  wPct = Math.min(wPct, 100 - xPct);
+  hPct = Math.min(hPct, 100 - yPct);
+  el.style.left   = `${xPct}%`;
+  el.style.top    = `${yPct}%`;
+  el.style.width  = `${wPct}%`;
+  el.style.height = `${hPct}%`;
   sendFrameUpdate(el);
 }
 
 function toggleMute(id, muted, slider) {
-  console.log(`Display ${id} muted: ${muted}`);
   slider.style.display = muted ? 'none' : 'inline-block';
   socket.emit('controlEvent', { type: 'mute', muted, id });
 }
 
 function changeVolume(id, volume) {
   volumes[id] = volume;
-  console.log(`Display ${id} volume: ${volume}`);
-
   socket.emit('controlEvent', { type: 'volume', volume, id });
-}
-
-function sendSoundUpdate(el) {
-  const id = parseInt(el.dataset.id, 10);
-  socket.emit('displayVolume', {
-    id,
-    volume: parseFloat(el.style.volume),
-    state: parseFloat(el.style.state),
-  });
 }
 
 function sendFrameUpdate(el) {
   const id = parseInt(el.dataset.id, 10);
-  socket.emit('frameUpdate', { id,
+  socket.emit('frameUpdate', {
+    id,
     x: parseFloat(el.style.left),
     y: parseFloat(el.style.top),
     width: parseFloat(el.style.width),
@@ -227,88 +222,98 @@ function sendFrameUpdate(el) {
   });
 }
 
-function uploadVideo() {
-  const file = document.getElementById('fileInput').files[0];
-  if (!file || file.type !== 'video/webm') { alert('WebM only'); document.getElementById('fileInput').value = ''; return; }
-  const form = new FormData(); form.append('video', file);
-  fetch('/upload', { method: 'POST', body: form }).then(loadVideoList);
-}
+
+// ==== VIDEO LIST ====
 
 function loadVideoList() {
   fetch('/videos/list')
     .then(res => res.json())
     .then(({ videos }) => {
-      const ul = document.getElementById('videoList'); ul.innerHTML = '';
+      const ul = document.getElementById('videoList');
+      ul.innerHTML = '';
       videos.forEach(name => {
-        const li = document.createElement('li'); li.className = 'list-group-item';
-        const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'selectedVideo'; radio.value = name;
-        radio.className = 'form-check-input me-2';
-        radio.addEventListener('change', () => selectVideo(name));
-        li.append(radio, document.createTextNode(name)); ul.appendChild(li);
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.textContent = name;
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-sm btn-primary ms-2';
+        btn.textContent = 'Play';
+        btn.addEventListener('click', () => {
+          masterPlayer.src({ type: 'video/webm', src: `/videos/${name}` });
+          masterPlayer.play();
+          socket.emit('controlEvent', { type: 'load', src: `/videos/${name}` });
+        });
+        li.appendChild(btn);
+        ul.appendChild(li);
       });
-    });
-}
-
-function selectVideo(filename) {
-  const url = `/videos/${filename}`;
-  masterPlayer.src({ type: 'video/webm', src: url }); masterPlayer.play();
-  socket.emit('controlEvent', { type: 'load', src: url });
+    })
+    .catch(console.error);
 }
 
 
+// ==== UPLOAD & CONVERSION ====
 
+function uploadVideo() {
+  showUploadToast();
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) {document.getElementById('fileInput').value = ''; return; }
+  const form = new FormData(); form.append('video', file);
+  fetch('/upload', { method: 'POST', body: form }).then(finishUpload);
+}
+
+
+function showUploadToast(clientId) {
+  const html = `
+    <div class="toast show" style="position:fixed; top:4rem; right:1rem; z-index:9999;">
+      <div class="toast-body d-flex align-items-center">
+        <img src="/assets/loading.gif" alt="Loading" style="width:24px; height:24px; margin-right:10px;">
+        <span data-i18n="convert.text">Uploading en cours, cela peut prendre jusqu'à 10 minutes selon la taille de la vidéo (ou plus)</span>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+
+function finishUpload() {
+  loadVideoList();                        
+  const toast = document.querySelector('.toast.show');
+  if (toast) toast.remove();
+  isUploading = false;
+  document.getElementById('btnUpload').disabled = false;
+}
+
+// ==== i18n TOAST ====
 
 $(document).ready(function() {
-  
   $('#languageSwitcher').on('change', function() {
-    const selectedLang = $(this).val();
-    
-    // Demander à i18next de changer de langue
-    i18next.changeLanguage(selectedLang, function(err, t) {
-      if (err) {
-        console.error('Erreur lors du changement de langue', err);
-      } else {
-        // Re-traduire tout le DOM
+    const lang = $(this).val();
+    i18next.changeLanguage(lang, function(err, t) {
+      if (!err) {
         $('body').localize();
-
-        // Afficher un message sympa
-        let message = '';
-        switch (selectedLang) {
-          case 'fr':
-            message = 'Langue changée : Français';
-            break;
-          case 'en':
-            message = 'Language changed: English';
-            break;
-          default:
-            message = 'Language changed: ' + selectedLang;
-        }
-
-        console.log(message);
-        showToast(message);
+        const msg = lang === 'fr'
+          ? 'Langue changée : Français'
+          : lang === 'en'
+            ? 'Language changed: English'
+            : 'Language changed : ' + lang;
+        showToast(msg);
       }
     });
   });
 });
 
-// Affichage toast (optionnel)
 function showToast(message) {
-  const toastHTML = `
-    <div class="toast align-items-center text-white bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true" style="position: absolute; top: 4rem; right: 1rem; z-index: 9999;">
+  const html = `
+    <div class="toast align-items-center text-white bg-primary border-0"
+         role="alert" aria-live="assertive" aria-atomic="true"
+         style="position:absolute; top:4rem; right:1rem; z-index:9999;">
       <div class="d-flex">
-        <div class="toast-body">
-          ${message}
-        </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        <div class="toast-body">${message}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
-    </div>
-  `;
-  
-  const $toast = $(toastHTML);
-  $('body').append($toast);
-  const toast = new bootstrap.Toast($toast[0]);
-  toast.show();
-  $toast.on('hidden.bs.toast', function () {
-    $(this).remove();
-  });
+    </div>`;
+  const $t = $(html);
+  $('body').append($t);
+  new bootstrap.Toast($t[0]).show();
+  $t.on('hidden.bs.toast', () => $t.remove());
 }

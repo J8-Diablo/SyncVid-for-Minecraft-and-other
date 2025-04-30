@@ -1,9 +1,12 @@
 {
   "name": "syncvid-for-minecraft-and-other",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "server.js",
+  "bin": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "nexe server.js --build --output dist/syncvid.exe",
+    "postbuild": "copyfiles -u 1 \"public/**/*\" \"locales/**/*\" dist/"
   },
   "dependencies": {
     "express": "^4.17.1",
@@ -13,6 +16,13 @@
     "video.js": "^8.5.2",
     "i18next": "^23.x",
     "i18next-browser-languagedetector": "^6.x",
-    "serve-static": "^1.x"
+    "serve-static": "^1.x",
+    "fluent-ffmpeg": "^2.1.2",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "ffprobe": "1.1.2"
+  },
+  
+  "devDependencies": {
+    "copyfiles": "^2.4.1"
   }
 }
