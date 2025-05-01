@@ -5,7 +5,7 @@
   "bin": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "nexe server.js --build --output dist/syncvid.exe",
+    "build": "pkg server.js --targets node10-win-x64",
     "postbuild": "copyfiles -u 1 \"public/**/*\" \"locales/**/*\" dist/"
   },
   "dependencies": {
@@ -28,7 +28,8 @@
     ],
     "assets": [
       "public/**/*",
-      "locales/**/*"
+      "locales/**/*",
+      "public/vendor/**/*"
     ],
     "executable": true,
     "output": "dist/syncvid"
