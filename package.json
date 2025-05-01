@@ -1,6 +1,6 @@
 {
   "name": "syncvid-for-minecraft-and-other",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "server.js",
   "bin": "server.js",
   "scripts": {

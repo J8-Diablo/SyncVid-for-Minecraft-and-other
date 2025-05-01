@@ -7,7 +7,7 @@ window.addEventListener('DOMContentLoaded', () => {
   socket.emit('registerDisplay', { id: displayId, width: window.innerWidth, height: window.innerHeight });
 });
 
-socket.on('controlEvent', ({ type, src, time, muted, volume,id }) => {
+socket.on('controlEvent', ({ type, src, time, muted, volume,id, brightness }) => {
   if (type === 'load') {
     slavePlayer.src({ type:'video/webm', src });
     slavePlayer.ready(() => { slavePlayer.currentTime(0); slavePlayer.play(); });
@@ -25,6 +25,12 @@ socket.on('controlEvent', ({ type, src, time, muted, volume,id }) => {
     const int_id = parseInt(id, 10);
     if (int_id !== displayId) return;
     slavePlayer.muted(muted);
+  } else if (type === 'brightness') {
+    const int_id = parseInt(id, 10);
+    if (int_id !== displayId) return;
+    // change opacity of "video-js" css with value
+    const videoContainer = slavePlayer.el();               // le conteneur principal Video.js
+    videoContainer.style.opacity = brightness;              // on ajuste l'opacité  
   }
 });
 

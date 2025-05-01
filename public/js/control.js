@@ -85,39 +85,84 @@ function renderDisplayList() {
   Object.keys(frames).forEach(id => {
     const frame = frames[id];
     const li = document.createElement('li');
-    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.className = 'list-group-item';
 
-    // Toggle visible
+    const row1 = document.createElement('div');
+    row1.className = 'd-flex justify-content-between';
+
+    const row2 = document.createElement('div');
+    row2.className = 'd-flex justify-content-between align-items-center';
+
+    const row3 = document.createElement('div');
+    row3.className = 'd-flex justify-content-between align-items-center';
+
+    // Screen Label
+    const span = document.createElement('span');
+    span.textContent = `Display ${id}`;
+    row1.appendChild(span);
+
+    // Edit label + toggle visible (inline, sans marge)
+    const editWrapper = document.createElement('div');
+    editWrapper.className = 'd-flex align-items-center';
+    const editLabel = document.createElement('label');
+    editLabel.textContent = 'Edit';
+    editLabel.style.marginRight = '4px';
     const chk = document.createElement('input');
     chk.type = 'checkbox';
     chk.checked = frame.style.width !== '0%' && frame.style.height !== '0%';
     chk.addEventListener('change', () => toggleDisplay(id, chk.checked));
-    li.appendChild(chk);
+    editWrapper.append(editLabel, chk);
+    row2.appendChild(editWrapper);
 
-    // Label
-    const span = document.createElement('span');
-    span.textContent = `Display ${id}`;
-    li.appendChild(span);
-
-    // Mute & volume
-    const lblMute = document.createElement('span');
+    // Mute + volume slider collés
+    const muteWrapper = document.createElement('div');
+    muteWrapper.className = 'd-flex align-items-center';
+    const lblMute = document.createElement('label');
     lblMute.textContent = 'Mute';
-    lblMute.classList.add('ms-2');
-    li.appendChild(lblMute);
-
+    lblMute.style.marginRight = '4px';
     const chkMute = document.createElement('input');
-    chkMute.type = 'checkbox'; chkMute.checked = true; chkMute.classList.add('ms-2');
-    chkMute.addEventListener('change', () => toggleMute(id, chkMute.checked, sliderVolume));
-    li.appendChild(chkMute);
+    chkMute.type = 'checkbox';
+    chkMute.checked = true;
+    chkMute.addEventListener('change', () => {
+      toggleMute(id, chkMute.checked, sliderVolume);
+    });
 
     const sliderVolume = document.createElement('input');
-    sliderVolume.type = 'range'; sliderVolume.min = 0; sliderVolume.max = 1; sliderVolume.step = 0.01;
-    sliderVolume.value = 1; sliderVolume.style.width = '100px'; sliderVolume.classList.add('ms-2');
+    sliderVolume.type = 'range';
+    sliderVolume.min = 0;
+    sliderVolume.max = 1;
+    sliderVolume.step = 0.01;
+    sliderVolume.value = 1;
+    sliderVolume.style.width = '100px';
+    sliderVolume.style.marginLeft = '4px';  // réduit l’espace
     sliderVolume.style.display = 'none';
     sliderVolume.addEventListener('input', () => changeVolume(id, sliderVolume.value));
-    li.appendChild(sliderVolume);
 
-    // Reset & Delete
+    muteWrapper.append(lblMute, chkMute, sliderVolume);
+    row2.appendChild(muteWrapper);
+
+    // Brightness control (inline)
+    const brightWrapper = document.createElement('div');
+    brightWrapper.className = 'd-flex align-items-center';
+    const lblBrightness = document.createElement('label');
+    lblBrightness.textContent = 'Brightness';
+    lblBrightness.style.marginRight = '4px';
+    const sliderBrightness = document.createElement('input');
+    sliderBrightness.type = 'range';
+    sliderBrightness.min = 0;
+    sliderBrightness.max = 1;
+    sliderBrightness.step = 0.01;
+    sliderBrightness.value = 1;
+    sliderBrightness.style.width = '100px';
+    sliderBrightness.addEventListener('input', () => {
+      const brightness = sliderBrightness.value;
+      frame.style.filter = `brightness(${brightness})`;
+      socket.emit('controlEvent', { type: 'brightness', brightness, id });
+    });
+    brightWrapper.append(lblBrightness, sliderBrightness);
+    row3.appendChild(brightWrapper);
+
+    // Reset & Delete buttons
     const btnGroup = document.createElement('div');
     const btnReset = document.createElement('button');
     btnReset.className = 'btn btn-sm btn-secondary me-2';
@@ -128,8 +173,9 @@ function renderDisplayList() {
     btnDelete.textContent = 'Delete';
     btnDelete.addEventListener('click', () => deleteDisplay(id));
     btnGroup.append(btnReset, btnDelete);
-    li.appendChild(btnGroup);
+    row3.appendChild(btnGroup);
 
+    li.append(row1, row2, row3);
     ul.appendChild(li);
   });
 }
@@ -209,6 +255,10 @@ function toggleMute(id, muted, slider) {
 function changeVolume(id, volume) {
   volumes[id] = volume;
   socket.emit('controlEvent', { type: 'volume', volume, id });
+}
+
+function changeBrightness(id, brightness) {
+  socket.emit('controlEvent', { type: 'brightness', brightness, id });
 }
 
 function sendFrameUpdate(el) {
