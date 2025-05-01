@@ -6,7 +6,6 @@ const path = require('path');
 const fs = require('fs');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const ffmpeg = require('fluent-ffmpeg');
-const ffprobe = require('ffprobe');
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 // Détection si l'application est exécutée depuis un binaire pkg
@@ -66,82 +65,6 @@ app.post('/upload', upload.single('video'), (req, res) => {
     });
   }
 });
-
-
-
-//     //get the total duration of the video with ffprobe
-//     // console.log the file sended
-//     //rename temp file to the original name
-//     console.log(`Fichier temporaire : ${temp}`);
-//     console.log(`Fichier original : ${orig}`);
-//     const ext = path.extname(orig).toLowerCase();
-//     if (ext === '.mp4') {
-//       console.log('Fichier MP4 détecté, renommage en WebM');
-//     fs.rename(temp, path.join(uploadsDir, orig), err => {
-//       if (err) {
-//         console.error('Erreur lors du renommage du fichier temporaire :', err);
-//         return res.status(500).json({ error: 'Erreur lors du renommage du fichier temporaire' });
-//       }
-//       console.log(`Fichier temporaire renommé : ${orig}`);
-//     }
-//     );
-//     const temp = path.join(uploadsDir, orig);
-
-//     ffprobe(temp, (err, data) => {
-//       if (err) {
-//         console.error('Erreur lors de la récupération des informations du fichier :', err);
-//         return res.status(500).json({ error: 'Erreur lors de la récupération des informations du fichier' });
-//       }
-//       const duration = data.format.duration;
-//       console.log(`Durée totale de la vidéo : ${duration} secondes`);
-//     });
-
-//     // Conversion vers WebM intégrale
-//     res.json({ filename: outputName });
-
-//     ffmpeg()
-//       .input(temp)
-//       .inputOptions([
-//       '-probesize', '50M',
-//       '-analyzeduration', '100M'
-//       ])
-//       .format('webm')
-//       .videoCodec('libvpx')
-//       .audioCodec('libvorbis')
-//       .outputOptions([
-//       '-b:v', '1M',
-//       '-auto-alt-ref', '0',
-//       '-pix_fmt', 'yuv420p',
-//       '-movflags', '+faststart'
-//       ])
-//       .on('start', cmd => console.log('FFmpeg démarré :', cmd))
-//       .on('progress', prog => {
-
-//       const percent = (timemarkToSeconds(prog.timemark) / duration ) * 100;
-      
-//       console.log(`Progression de la conversion : ${percent}%`);
-//       io.to('control').emit(`conversionProgress:${clientId}`, { percent });
-//       })
-//       .on('end', () => {
-//         io.to('control').emit(`conversionDone:${clientId}`, { url: `/videos/${outputName}` });        console.log(`Conversion terminée pour ${outputName}`);
-//         fs.unlink(temp, err => {
-//           if (err) console.error('Erreur lors de la suppression du fichier temporaire :', err);
-//           else console.log('Fichier temporaire supprimé :', temp);
-//         });
-//       })
-//       .on('error', err => {
-//         io.to('control').emit(`conversionError:${clientId}`, { message: err.message });
-//         console.error(`Erreur de conversion pour ${outputName} :`, err);
-//         fs.unlink(temp, err => {
-//           if (err) console.error('Erreur lors de la suppression du fichier temporaire :', err);
-//           else console.log('Fichier temporaire supprimé :', temp);
-//         });
-//       })
-//       .save(outputPath);
-//   }
-// });
-
-
 
 // Route pour lister les vidéos
 app.get('/videos/list', (req, res) => {
