@@ -16,13 +16,21 @@
     "video.js": "^8.5.2",
     "i18next": "^23.x",
     "i18next-browser-languagedetector": "^6.x",
-    "serve-static": "^1.x",
-    "fluent-ffmpeg": "^2.1.2",
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "ffprobe": "1.1.2"
+    "serve-static": "^1.x"
   },
   
   "devDependencies": {
     "copyfiles": "^2.4.1"
+  },
+  "pkg": {
+    "targets": [
+      "node18-win-x64"
+    ],
+    "assets": [
+      "public/**/*",
+      "locales/**/*"
+    ],
+    "executable": true,
+    "output": "dist/syncvid"
   }
 }

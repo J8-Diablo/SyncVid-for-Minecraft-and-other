@@ -1,0 +1,9 @@
+# ignore ALL .webm files
+*.webm
+
+# ignore node_modules
+node_modules/
+package-lock.json
+
+# ignore .txt files
+*.txt
