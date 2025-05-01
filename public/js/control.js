@@ -267,7 +267,7 @@ function showUploadToast(clientId) {
     <div class="toast show" style="position:fixed; top:4rem; right:1rem; z-index:9999;">
       <div class="toast-body d-flex align-items-center">
         <img src="/assets/loading.gif" alt="Loading" style="width:24px; height:24px; margin-right:10px;">
-        <span data-i18n="convert.text">Uploading en cours, cela peut prendre jusqu'à 10 minutes selon la taille de la vidéo (ou plus)</span>
+        <span data-i18n="convert.text">Uploading en cours, cela peut prendre un certain temps</span>
       </div>
     </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
