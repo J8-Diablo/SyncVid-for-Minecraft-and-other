@@ -5,7 +5,7 @@ SyncVid is a lightweight Node.js application designed to synchronize and display
 
 
 ## Minecraft Prewiew
-[![Demo](https://i9.ytimg.com/vi/CK7inxjrOEw/mq2.jpg?sqp=COTPvcAG-oaymwEmCMACELQB8quKqQMa8AEB-AHUBoAC4AOKAgwIABABGE4gWyhlMA8=&rs=AOn4CLBlnyZI9aTsGSlrtydFsVRHYMuINw)](https://www.youtube.com/watch?v=CK7inxjrOEw "Demo")
+[![Demo](https://img.youtube.com/vi/CK7inxjrOEw/0.jpg)](https://www.youtube.com/watch?v=CK7inxjrOEw "Demo")
 
 ## Features
 - **Easy Setup**: Clone the repository and install dependencies with a single command.
