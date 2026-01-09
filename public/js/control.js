@@ -6,6 +6,15 @@ const frames = {};
 const frameBackup = {};
 const defaultFrame = { x:0, y:0, width:50, height:50 };
 const volumes = {};
+const layoutList = document.getElementById('layoutList');
+
+
+function t(key, fallback, options = {}) {
+  if (window.i18next && typeof i18next.t === 'function') {
+    return i18next.t(key, { defaultValue: fallback, ...options });
+  }
+  return fallback || key;
+}
 
 
 // ➤ Variables pour l’upload/conversion
@@ -29,6 +38,16 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnAddDisplay').addEventListener('click', addDisplayFrame);
   document.getElementById('btnUpload').addEventListener('click', () => document.getElementById('fileInput').click());
   document.getElementById('fileInput').addEventListener('change', uploadVideo);
+  const btnSaveLayout = document.getElementById('btnSaveLayout');
+  const btnImportLayout = document.getElementById('btnImportLayout');
+  const layoutImportInput = document.getElementById('layoutImportInput');
+  if (btnSaveLayout) btnSaveLayout.addEventListener('click', saveLayout);
+  if (btnImportLayout && layoutImportInput) {
+    btnImportLayout.addEventListener('click', () => layoutImportInput.click());
+    layoutImportInput.addEventListener('change', importLayout);
+  }
+  loadLayoutList();
+  initApiConfigModal();
 
   // Écoute globale des events conversion
   socket.on('conversionError', data => {
@@ -41,22 +60,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==== GESTION DES FRAMES D’AFFICHAGE ====
 
-function addDisplayFrame() {
-  const id = nextDisplayId++;
+function createDisplayFrame(options = {}) {
+  const parsedId = Number.parseInt(options.id, 10);
+  const frameId = Number.isFinite(parsedId) ? parsedId : nextDisplayId++;
+  if (Number.isFinite(parsedId)) {
+    nextDisplayId = Math.max(nextDisplayId, frameId + 1);
+  }
+
   const frame = document.createElement('div');
   frame.classList.add('display-frame');
-  frame.dataset.id = id;
-  frame.textContent = id;
-  frame.style.left   = defaultFrame.x + '%';
-  frame.style.top    = defaultFrame.y + '%';
-  frame.style.width  = defaultFrame.width + '%';
-  frame.style.height = defaultFrame.height + '%';
+  frame.dataset.id = frameId;
+  frame.textContent = frameId;
+
+  const left = Number.isFinite(parseFloat(options.x)) ? parseFloat(options.x) : defaultFrame.x;
+  const top = Number.isFinite(parseFloat(options.y)) ? parseFloat(options.y) : defaultFrame.y;
+  const width = Number.isFinite(parseFloat(options.width)) ? parseFloat(options.width) : defaultFrame.width;
+  const height = Number.isFinite(parseFloat(options.height)) ? parseFloat(options.height) : defaultFrame.height;
+
+  frame.style.left = `${left}%`;
+  frame.style.top = `${top}%`;
+  frame.style.width = `${width}%`;
+  frame.style.height = `${height}%`;
+
   container.appendChild(frame);
-  frames[id] = frame;
+  frames[frameId] = frame;
   setupInteractions(frame);
+
+  if (options.openWindow) {
+    window.open(`/display/${frameId}`, `display-${frameId}`, `width=800,height=450`);
+  }
+
+  return frame;
+}
+
+function addDisplayFrame() {
+  const frame = createDisplayFrame({ openWindow: true });
   renderDisplayList();
   sendFrameUpdate(frame);
-  window.open(`/display/${id}`, `display-${id}`, `width=800,height=450`);
 }
 
 function setupInteractions(frame) {
@@ -98,14 +138,14 @@ function renderDisplayList() {
 
     // Screen Label
     const span = document.createElement('span');
-    span.textContent = `Display ${id}`;
+    span.textContent = t('display.item', `Display ${id}`, { id });
     row1.appendChild(span);
 
     // Edit label + toggle visible (inline, sans marge)
     const editWrapper = document.createElement('div');
     editWrapper.className = 'd-flex align-items-center';
     const editLabel = document.createElement('label');
-    editLabel.textContent = 'Edit';
+    editLabel.textContent = t('display.edit', 'Edit');
     editLabel.style.marginRight = '4px';
     const chk = document.createElement('input');
     chk.type = 'checkbox';
@@ -118,7 +158,7 @@ function renderDisplayList() {
     const muteWrapper = document.createElement('div');
     muteWrapper.className = 'd-flex align-items-center';
     const lblMute = document.createElement('label');
-    lblMute.textContent = 'Mute';
+    lblMute.textContent = t('display.mute', 'Mute');
     lblMute.style.marginRight = '4px';
     const chkMute = document.createElement('input');
     chkMute.type = 'checkbox';
@@ -145,7 +185,7 @@ function renderDisplayList() {
     const brightWrapper = document.createElement('div');
     brightWrapper.className = 'd-flex align-items-center';
     const lblBrightness = document.createElement('label');
-    lblBrightness.textContent = 'Brightness';
+    lblBrightness.textContent = t('display.brightness', 'Brightness');
     lblBrightness.style.marginRight = '4px';
     const sliderBrightness = document.createElement('input');
     sliderBrightness.type = 'range';
@@ -166,11 +206,11 @@ function renderDisplayList() {
     const btnGroup = document.createElement('div');
     const btnReset = document.createElement('button');
     btnReset.className = 'btn btn-sm btn-secondary me-2';
-    btnReset.textContent = 'Reset';
+    btnReset.textContent = t('display.reset', 'Reset');
     btnReset.addEventListener('click', () => resetDisplay(id));
     const btnDelete = document.createElement('button');
     btnDelete.className = 'btn btn-sm btn-danger';
-    btnDelete.textContent = 'Delete';
+    btnDelete.textContent = t('display.delete', 'Delete');
     btnDelete.addEventListener('click', () => deleteDisplay(id));
     btnGroup.append(btnReset, btnDelete);
     row3.appendChild(btnGroup);
@@ -273,6 +313,353 @@ function sendFrameUpdate(el) {
 }
 
 
+// ==== LAYOUTS ====
+
+function captureLayoutFrames() {
+  return Object.values(frames).map(frame => ({
+    id: parseInt(frame.dataset.id, 10),
+    x: parseFloat(frame.style.left),
+    y: parseFloat(frame.style.top),
+    width: parseFloat(frame.style.width),
+    height: parseFloat(frame.style.height)
+  }));
+}
+
+function defaultLayoutName() {
+  const now = new Date();
+  const pad = value => String(value).padStart(2, '0');
+  return `layout-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+function saveLayout() {
+  const framesData = captureLayoutFrames();
+  if (!framesData.length) {
+    showToast('Aucun display à sauvegarder');
+    return;
+  }
+  const name = window.prompt(t('layout.promptName', 'Layout name'), defaultLayoutName());
+  if (!name) return;
+  fetch('/layouts/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, frames: framesData })
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('save failed');
+      return res.json();
+    })
+    .then(() => {
+      loadLayoutList();
+      showToast('Layout sauvegardé');
+    })
+    .catch(console.error);
+}
+
+function importLayout(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const name = (data && data.name) || file.name.replace(/\.json$/i, '') || defaultLayoutName();
+      const framesData = Array.isArray(data.frames) ? data.frames : [];
+      if (!framesData.length) {
+        showToast(t('layout.invalidFile', 'Invalid layout file'));
+        return;
+      }
+      fetch('/layouts/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, frames: framesData })
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('import failed');
+          return res.json();
+        })
+        .then(() => {
+          loadLayoutList();
+          showToast('Layout importé');
+        })
+        .catch(console.error);
+    } catch (err) {
+      console.error(err);
+      showToast(t('layout.readError', 'Unable to read layout'));
+    }
+  };
+  reader.readAsText(file);
+}
+
+function loadLayoutList() {
+  if (!layoutList) return;
+  fetch('/layouts/list')
+    .then(res => {
+      if (!res.ok) throw new Error('list failed');
+      return res.json();
+    })
+    .then(({ layouts }) => renderLayoutList(layouts || []))
+    .catch(console.error);
+}
+
+function renderLayoutList(layouts) {
+  if (!layoutList) return;
+  layoutList.innerHTML = '';
+  if (!layouts.length) {
+    const empty = document.createElement('li');
+    empty.className = 'list-group-item text-body-secondary';
+    empty.textContent = 'Aucun layout sauvegardé';
+    layoutList.appendChild(empty);
+    return;
+  }
+  layouts.forEach(layout => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item layout-item';
+
+    const title = document.createElement('div');
+    title.className = 'layout-title';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'layout-name';
+    const name = layout.name || layout.id;
+    nameSpan.textContent = name;
+    nameSpan.title = name;
+
+    const idSpan = document.createElement('span');
+    idSpan.className = 'layout-id';
+    idSpan.textContent = layout.id ? `ID: ${layout.id}` : '';
+
+    title.append(nameSpan, idSpan);
+
+    const actions = document.createElement('div');
+    actions.className = 'layout-actions';
+
+    const btnLoad = document.createElement('button');
+    btnLoad.className = 'btn btn-sm btn-primary';
+    btnLoad.textContent = t('layout.load', 'Load');
+    btnLoad.addEventListener('click', () => loadLayout(layout.id));
+
+    const btnExport = document.createElement('button');
+    btnExport.className = 'btn btn-sm btn-secondary';
+    btnExport.textContent = t('layout.export', 'Export');
+    btnExport.addEventListener('click', () => exportLayout(layout.id));
+
+    const btnDelete = document.createElement('button');
+    btnDelete.className = 'btn btn-sm btn-danger';
+    btnDelete.textContent = t('display.delete', 'Delete');
+    btnDelete.addEventListener('click', () => deleteLayout(layout.id));
+
+    actions.append(btnLoad, btnExport, btnDelete);
+    li.append(title, actions);
+    layoutList.appendChild(li);
+  });
+}
+
+function loadLayout(id) {
+  fetch(`/layouts/${encodeURIComponent(id)}`)
+    .then(res => {
+      if (!res.ok) throw new Error('load failed');
+      return res.json();
+    })
+    .then(layout => applyLayout(layout))
+    .catch(console.error);
+}
+
+function applyLayout(layout) {
+  const layoutFrames = Array.isArray(layout.frames) ? layout.frames : [];
+  if (!layoutFrames.length) {
+    showToast(t('layout.emptyLayout', 'Empty layout'));
+    return;
+  }
+  Object.values(frames).forEach(frame => frame.remove());
+  Object.keys(frames).forEach(key => delete frames[key]);
+  Object.keys(frameBackup).forEach(key => delete frameBackup[key]);
+
+  let maxId = 0;
+  layoutFrames.forEach(item => {
+    const frame = createDisplayFrame({
+      id: item.id,
+      x: item.x,
+      y: item.y,
+      width: item.width,
+      height: item.height,
+      openWindow: true
+    });
+    maxId = Math.max(maxId, parseInt(frame.dataset.id, 10));
+    sendFrameUpdate(frame);
+  });
+  nextDisplayId = Math.max(nextDisplayId, maxId + 1);
+  renderDisplayList();
+}
+
+function exportLayout(id) {
+  window.location.href = `/layouts/export/${encodeURIComponent(id)}`;
+}
+
+function deleteLayout(id) {
+  fetch(`/layouts/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    .then(res => {
+      if (!res.ok) throw new Error('delete failed');
+      loadLayoutList();
+    })
+    .catch(console.error);
+}
+
+
+// ==== API CONFIG ====
+
+let apiConfigModal = null;
+const apiStorageKeys = {
+  token: 'dmxApiToken'
+};
+
+function getStoredValue(key) {
+  try {
+    return localStorage.getItem(key) || '';
+  } catch (err) {
+    return '';
+  }
+}
+
+function setStoredValue(key, value) {
+  try {
+    if (value) {
+      localStorage.setItem(key, value);
+    } else {
+      localStorage.removeItem(key);
+    }
+  } catch (err) {
+    // ignore storage issues
+  }
+}
+
+function initApiConfigModal() {
+  const modalEl = document.getElementById('apiConfigModal');
+  const btnOpen = document.getElementById('btnApiConfig');
+  const btnSave = document.getElementById('apiSaveBtn');
+  const btnGenerate = document.getElementById('apiGenerateToken');
+  const btnCopy = document.getElementById('apiCopyToken');
+  const apiEnabled = document.getElementById('apiEnabled');
+  const tokenInput = document.getElementById('apiToken');
+
+  if (modalEl && typeof bootstrap !== 'undefined') {
+    apiConfigModal = new bootstrap.Modal(modalEl);
+  }
+
+  if (btnOpen) {
+    btnOpen.addEventListener('click', () => {
+      if (tokenInput && !tokenInput.value) {
+        tokenInput.value = getStoredValue(apiStorageKeys.token);
+      }
+      loadApiConfig();
+      if (apiConfigModal) apiConfigModal.show();
+    });
+  }
+
+  if (btnSave) btnSave.addEventListener('click', saveApiConfig);
+  if (btnGenerate) btnGenerate.addEventListener('click', generateApiToken);
+  if (btnCopy) btnCopy.addEventListener('click', copyApiToken);
+  if (apiEnabled) apiEnabled.addEventListener('change', updateApiTokenState);
+  if (tokenInput) tokenInput.addEventListener('input', () => setStoredValue(apiStorageKeys.token, tokenInput.value.trim()));
+
+  updateApiTokenState();
+}
+
+function updateApiTokenState() {
+  const apiEnabled = document.getElementById('apiEnabled');
+  const tokenInput = document.getElementById('apiToken');
+  if (!apiEnabled || !tokenInput) return;
+  tokenInput.placeholder = apiEnabled.checked ? 'token requis' : 'token optionnel';
+}
+
+function loadApiConfig() {
+  fetch('/api/config')
+    .then(res => res.json())
+    .then(config => {
+      const apiEnabled = document.getElementById('apiEnabled');
+      const tokenInput = document.getElementById('apiToken');
+      const tokenHint = document.getElementById('apiTokenHint');
+
+      if (apiEnabled) apiEnabled.checked = Boolean(config.enabled);
+      if (tokenInput && typeof config.token === 'string') {
+        tokenInput.value = config.token;
+        setStoredValue(apiStorageKeys.token, config.token);
+      }
+      if (tokenHint) {
+        tokenHint.textContent = '';
+      }
+      updateApiTokenState();
+    })
+    .catch(console.error);
+}
+
+function saveApiConfig() {
+  const apiEnabled = document.getElementById('apiEnabled');
+  const tokenInput = document.getElementById('apiToken');
+
+  if (!apiEnabled || !tokenInput) return;
+  const enabled = Boolean(apiEnabled.checked);
+  const token = tokenInput.value.trim();
+
+  if (enabled && !token) {
+    showToast(t('api.tokenRequired', 'Token required to enable API'));
+    return;
+  }
+
+  fetch('/api/config', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ enabled, token })
+  })
+    .then(async res => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'save failed');
+      return data;
+    })
+    .then(data => {
+      if (tokenInput && data.token) tokenInput.value = data.token;
+      setStoredValue(apiStorageKeys.token, data.token || token);
+      showToast(t('api.updated', 'API updated'));
+      loadApiConfig();
+    })
+    .catch(err => {
+      console.error(err);
+      showToast(t('api.saveError', 'API save error'));
+    });
+}
+
+function generateApiToken() {
+  const tokenInput = document.getElementById('apiToken');
+  if (!tokenInput) return;
+  let token = '';
+  if (window.crypto && window.crypto.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    token = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  } else {
+    token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  }
+  tokenInput.value = token;
+  setStoredValue(apiStorageKeys.token, token);
+}
+
+function copyApiToken() {
+  const tokenInput = document.getElementById('apiToken');
+  if (!tokenInput || !tokenInput.value) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(tokenInput.value).then(() => {
+      showToast(t('api.tokenCopied', 'Token copied'));
+    });
+  } else {
+    tokenInput.select();
+    document.execCommand('copy');
+    showToast(t('api.tokenCopied', 'Token copied'));
+  }
+}
+
+
 // ==== VIDEO LIST ====
 
 function loadVideoList() {
@@ -283,17 +670,23 @@ function loadVideoList() {
       ul.innerHTML = '';
       videos.forEach(name => {
         const li = document.createElement('li');
-        li.className = 'list-group-item d-flex justify-content-between align-items-center';
-        li.textContent = name;
+        li.className = 'list-group-item video-item';
+
+        const title = document.createElement('span');
+        title.className = 'video-title';
+        title.textContent = name;
+        title.title = name;
+
         const btn = document.createElement('button');
-        btn.className = 'btn btn-sm btn-primary ms-2';
-        btn.textContent = 'Play';
+        btn.className = 'btn btn-sm btn-primary ms-2 video-play-btn';
+        btn.textContent = t('video.play', 'Play');
         btn.addEventListener('click', () => {
           masterPlayer.src({ type: 'video/webm', src: `/videos/${name}` });
           masterPlayer.play();
           socket.emit('controlEvent', { type: 'load', src: `/videos/${name}` });
         });
-        li.appendChild(btn);
+
+        li.append(title, btn);
         ul.appendChild(li);
       });
     })
@@ -346,6 +739,9 @@ $(document).ready(function() {
             ? 'Language changed: English'
             : 'Language changed : ' + lang;
         showToast(msg);
+        loadVideoList();
+        renderDisplayList();
+        loadLayoutList();
       }
     });
   });

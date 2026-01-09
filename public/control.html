@@ -54,50 +54,71 @@
       z-index: 500;
     }
   </style>
+  <link href="/app.css" rel="stylesheet">
 </head>
 <body>
-  <nav class="navbar navbar-dark bg-dark mb-3">
+  <nav class="navbar navbar-dark bg-dark mb-3 app-nav">
     <div class="container-fluid">
       <a class="navbar-brand me-auto" href="#" data-i18n="title">Video Sync Control</a>
-      <div class="d-flex align-items-center">
+      <div class="d-flex align-items-center app-actions">
         <button id="btnAddDisplay" class="btn btn-outline-light me-2" data-i18n="AddDisplay">Ajouter Display</button>
         <button id="btnUpload" class="btn btn-outline-light me-2" data-i18n="videoUpload">Uploader Vidéo</button>
+        <button id="btnApiConfig" class="btn btn-outline-light me-2" data-i18n="api.button">API DMX</button>
         <select class="form-select w-auto me-2" id="languageSwitcher">
           <option value="en">English</option>
           <option value="fr" selected>Français</option>
+          <option value="de">Deutsch</option>
+          <option value="ge">German</option>
           <option value="nl">Nederlands</option>
-        </select>
+          <option value="it">Italiano</option>
+          <option value="es">Español</option>
+          <option value="pt">Português</option>
+</select>
         <input type="file" id="fileInput" accept="video/*" class="d-none">
       </div>
     </div>
   </nav>
-  <div class="container">
-    <div class="row">
+  <div class="container app-main">
+    <div class="row g-4">
 
       <div class="col-md-8">
-        <div id="canvasContainer">
-          <video id="masterVideo" class="video-js vjs-default-skin" controls playsinline preload="auto"></video>
+        <div class="app-panel app-video-panel">
+          <div id="canvasContainer">
+            <video id="masterVideo" class="video-js vjs-default-skin" controls playsinline preload="auto"></video>
+          </div>
+          <div class="layout-actions-bar">
+            <button id="btnSaveLayout" class="btn btn-outline-light" data-i18n="layout.save">Sauvegarder layout</button>
+            <button id="btnImportLayout" class="btn btn-outline-light" data-i18n="layout.import">Importer layout</button>
+            <input type="file" id="layoutImportInput" accept="application/json" class="d-none">
+          </div>
+        </div>
+        <div class="app-panel">
+          <h5 data-i18n="layout.list">Liste des layouts</h5>
+          <ul id="layoutList" class="list-group scroll-list"></ul>
         </div>
       </div>
       <div class="col-md-4">
-        <h5 data-i18n="listvideo">Liste des vidéos</h5>
-        <ul id="videoList" class="list-group mb-4"></ul>
-
-        <h5 data-i18n="displaylist">Liste des Displays</h5>
-        <ul id="displayList" class="list-group"></ul>
+        <div class="app-panel">
+          <h5 data-i18n="listvideo">Liste des vidéos</h5>
+          <ul id="videoList" class="list-group scroll-list"></ul>
+        </div>
+        <div class="app-panel">
+          <h5 data-i18n="displaylist">Liste des Displays</h5>
+          <ul id="displayList" class="list-group scroll-list"></ul>
+        </div>
       </div>
     </div>
   </div>
-  <footer class="container d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
+  <footer class="container d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top app-footer">
     <div class="col-md-4 d-flex align-items-center">
       <ul class="nav col-md-5 justify-content-start list-unstyled d-flex">
-        <li class="mb-3 mb-md-0 text-body-secondary">Made By J-Diablo for you</li>
+        <li class="mb-3 mb-md-0 text-body-secondary" data-i18n="footer.madeBy">Made By J-Diablo for you</li>
         <li class="mb-3 mb-md-0 text-body-secondary">CC BY-NC-SA 4.0
               <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">
                 <img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-nc-sa.svg" alt="CC BY-NC-SA 4.0" height="40">
               </a>
         </li>
-        <li class="mb-3 mb-md-0 text-body-secondary">Version 1.0.3</li>
+        <li class="mb-3 mb-md-0 text-body-secondary" data-i18n="footer.version">Version 2.0.0</li>
       </ul>
     </div>
     <ul class="nav col-md-4 justify-content-end list-unstyled d-flex">
@@ -105,6 +126,48 @@
       <li class="ms-3"><a class="text-body-secondary" href="https://www.twitch.tv/J_diablo" aria-label="Facebook">Twitch</a></li>
     </ul>
   </footer>
+
+  <div class="modal fade" id="apiConfigModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content app-modal">
+        <div class="modal-header">
+          <h5 class="modal-title" data-i18n="api.modalTitle">API DMX Control</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="apiEnabled">
+            <label class="form-check-label" for="apiEnabled" data-i18n="api.enable">Activer l'API</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="apiToken" data-i18n="api.tokenLabel">Token API</label>
+            <div class="input-group">
+              <input type="text" class="form-control" id="apiToken" placeholder="ex: 32 chars" data-i18n="api.tokenPlaceholder" data-i18n-attr="placeholder">
+              <button class="btn btn-outline-light" type="button" id="apiGenerateToken" data-i18n="api.generate">Generer</button>
+              <button class="btn btn-outline-light" type="button" id="apiCopyToken" data-i18n="api.copy">Copier</button>
+            </div>
+            <div id="apiTokenHint" class="form-text text-body-secondary"></div>
+          </div>
+          <div class="api-endpoints">
+            <div class="small text-body-secondary" data-i18n="api.endpoints">Endpoints</div>
+            <ul class="small">
+              <li>POST /api/play</li>
+              <li>POST /api/pause</li>
+              <li>POST /api/seek {"time": 12.3}</li>
+              <li>POST /api/load-video {"name": "file.webm"}</li>
+              <li>POST /api/load-layout {"id": "layout-id"}</li>
+            </ul>
+            <div class="small text-body-secondary" data-i18n="api.headerHint">Header: x-api-token: &lt;token&gt;</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal" data-i18n="common.close">Fermer</button>
+          <button type="button" class="btn btn-primary" id="apiSaveBtn" data-i18n="common.save">Sauvegarder</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://vjs.zencdn.net/8.5.2/video.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
