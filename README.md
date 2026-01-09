@@ -42,6 +42,24 @@ SyncVid is a lightweight Node.js application designed to synchronize and display
 3. **Change default port (optional)**  
    Edit the port value at the bottom of `server.js` (default is `3000`).
 
+## Build .exe (Windows)
+
+1. **Install dependencies**  
+   ```bash
+   npm install
+   ```
+
+2. **Build the release**  
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\build_exe.ps1
+   ```
+
+3. **Output**  
+   `dist\SyncVid.exe`
+
+**User data location (EXE)**  
+`%APPDATA%\SyncVid\` (videos, uploads, layouts, config)
+
 ## Known Issues
 
 - **Security**: No authentication—exposing the app publicly allows anyone to control your instance.

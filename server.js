@@ -9,7 +9,9 @@ const cors = require('cors');
 
 // Détection si l'application est exécutée depuis un binaire pkg
 const isPkg = typeof process.pkg !== 'undefined';
-const baseDir = isPkg ? process.cwd() : __dirname; // Utilisation de process.cwd() si c'est un binaire
+const resourceDir = __dirname;
+const appDataRoot = process.env.APPDATA || process.env.LOCALAPPDATA || process.cwd();
+const dataDir = isPkg ? path.join(appDataRoot, 'SyncVid') : resourceDir;
 
 const app = express();
 const server = http.createServer(app);
@@ -27,24 +29,52 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // Définition des chemins en utilisant baseDir
-const videosDir = path.join(baseDir, 'public/videos');
-const uploadsDir = path.join(baseDir, 'uploads');
-const layoutsDir = path.join(baseDir, 'layouts');
-const configDir = path.join(baseDir, 'config');
+const publicDir = path.join(resourceDir, 'public');
+const localesDir = path.join(resourceDir, 'locales');
+const resourceVideosDir = path.join(publicDir, 'videos');
+const videosDir = isPkg ? path.join(dataDir, 'videos') : resourceVideosDir;
+const uploadsDir = isPkg ? path.join(dataDir, 'uploads') : path.join(resourceDir, 'uploads');
+const layoutsDir = isPkg ? path.join(dataDir, 'layouts') : path.join(resourceDir, 'layouts');
+const configDir = isPkg ? path.join(dataDir, 'config') : path.join(resourceDir, 'config');
 const apiConfigPath = path.join(configDir, 'api.json');
 
 // Création des dossiers nécessaires
+fs.mkdirSync(dataDir, { recursive: true });
 fs.mkdirSync(videosDir, { recursive: true });
 fs.mkdirSync(uploadsDir, { recursive: true });
 fs.mkdirSync(layoutsDir, { recursive: true });
 fs.mkdirSync(configDir, { recursive: true });
+
+function seedVideos() {
+  if (!isPkg) return;
+  try {
+    const existing = fs.readdirSync(videosDir).filter(f => /\.webm$/i.test(f));
+    if (existing.length) return;
+    if (!fs.existsSync(resourceVideosDir)) return;
+    fs.readdirSync(resourceVideosDir)
+      .filter(f => /\.webm$/i.test(f))
+      .forEach(file => {
+        const src = path.join(resourceVideosDir, file);
+        const dst = path.join(videosDir, file);
+        try {
+          fs.copyFileSync(src, dst);
+        } catch (err) {
+          // Ignore copy errors and continue.
+        }
+      });
+  } catch (err) {
+    // Ignore seeding errors.
+  }
+}
+
+seedVideos();
 
 // Configuration de Multer
 const upload = multer({ dest: uploadsDir });
 
 // Servir les fichiers statiques
 app.use('/videos', express.static(videosDir));
-app.use(express.static(path.join(baseDir, 'public')));
+app.use(express.static(publicDir));
 
 function sanitizeLayoutId(name) {
   const cleaned = String(name || '')
@@ -299,13 +329,13 @@ app.post('/api/load-layout', requireApiToken, (req, res) => {
 
 // Pages HTML
 app.get('/', (req, res) => res.redirect('/control'));
-app.get('/control', (req, res) => res.sendFile(path.join(baseDir, 'public/control.html')));
-app.get('/display/:id', (req, res) => res.sendFile(path.join(baseDir, 'public/display.html')));
+app.get('/control', (req, res) => res.sendFile(path.join(publicDir, 'control.html')));
+app.get('/display/:id', (req, res) => res.sendFile(path.join(publicDir, 'display.html')));
 
 // Traduction locale
 app.get('/locales/:lng/translation.json', (req, res) => {
   const lng = req.params.lng;
-  const filePath = path.join(baseDir, 'locales', lng, 'translation.json');
+  const filePath = path.join(localesDir, lng, 'translation.json');
   fs.readFile(filePath, 'utf8', (err, data) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(JSON.parse(data));
