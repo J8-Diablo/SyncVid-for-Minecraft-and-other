@@ -38,7 +38,7 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT") or 3000)
 START_URL = f"http://{HOST}:{PORT}/control"
 APP_NAME = "SyncVid"
-APP_VERSION = "4.0.0"
+APP_VERSION = "4.1.0"
 
 IS_FROZEN = getattr(sys, "frozen", False)
 RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))

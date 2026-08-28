@@ -6,6 +6,7 @@ Compatible with the existing public/ frontend and socket.io JS client.
 from __future__ import annotations
 
 import asyncio
+import atexit
 import json
 import os
 import re
@@ -315,6 +316,7 @@ async def start_rtmp_transcode(url: str, listen_mode: bool = True) -> None:
         creationflags=NO_WINDOW,
     )
     rtmp_process = proc
+    _win_assign_to_job(proc.pid)
     asyncio.create_task(_rtmp_log_reader(proc))
 
 
@@ -659,6 +661,92 @@ def webrtc_python() -> Optional[str]:
     return None
 
 
+# Windows job object holding every child we spawn. Closing its handle — which
+# happens automatically when this process dies, however violently — kills the
+# whole job. Without it, force-quitting SyncVid leaves the WebRTC server running
+# and squatting its port, so the next launch cannot start it again.
+_win_job_handle = None
+
+_JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
+_JobObjectExtendedLimitInformation = 9
+_PROCESS_SET_QUOTA = 0x0100
+_PROCESS_TERMINATE = 0x0001
+
+
+def _win_kill_on_close_job():
+    """Create (once) a job object that kills its members when we exit."""
+    global _win_job_handle
+    if _win_job_handle is not None or sys.platform != "win32":
+        return _win_job_handle
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class IO_COUNTERS(ctypes.Structure):
+            _fields_ = [(n, ctypes.c_ulonglong) for n in (
+                "ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+                "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+        class BASIC_LIMITS(ctypes.Structure):
+            _fields_ = [
+                ("PerProcessUserTimeLimit", ctypes.c_int64),
+                ("PerJobUserTimeLimit", ctypes.c_int64),
+                ("LimitFlags", wintypes.DWORD),
+                ("MinimumWorkingSetSize", ctypes.c_size_t),
+                ("MaximumWorkingSetSize", ctypes.c_size_t),
+                ("ActiveProcessLimit", wintypes.DWORD),
+                ("Affinity", ctypes.POINTER(wintypes.ULONG)),
+                ("PriorityClass", wintypes.DWORD),
+                ("SchedulingClass", wintypes.DWORD),
+            ]
+
+        class EXTENDED_LIMITS(ctypes.Structure):
+            _fields_ = [
+                ("BasicLimitInformation", BASIC_LIMITS),
+                ("IoInfo", IO_COUNTERS),
+                ("ProcessMemoryLimit", ctypes.c_size_t),
+                ("JobMemoryLimit", ctypes.c_size_t),
+                ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                ("PeakJobMemoryUsed", ctypes.c_size_t),
+            ]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        job = kernel32.CreateJobObjectW(None, None)
+        if not job:
+            return None
+        info = EXTENDED_LIMITS()
+        info.BasicLimitInformation.LimitFlags = _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not kernel32.SetInformationJobObject(
+            job, _JobObjectExtendedLimitInformation,
+            ctypes.byref(info), ctypes.sizeof(info),
+        ):
+            kernel32.CloseHandle(job)
+            return None
+        _win_job_handle = job
+    except Exception as exc:
+        print(f"[webrtc] job object unavailable: {exc}", flush=True)
+        return None
+    return _win_job_handle
+
+
+def _win_assign_to_job(pid: int) -> bool:
+    job = _win_kill_on_close_job()
+    if not job:
+        return False
+    try:
+        import ctypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        handle = kernel32.OpenProcess(_PROCESS_SET_QUOTA | _PROCESS_TERMINATE, False, pid)
+        if not handle:
+            return False
+        try:
+            return bool(kernel32.AssignProcessToJobObject(job, handle))
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:
+        return False
+
+
 def webrtc_append_log(line: str) -> None:
     global webrtc_log_seq
     webrtc_log.append(line)
@@ -736,6 +824,8 @@ async def start_webrtc() -> tuple[bool, str]:
         return False, f"Lancement impossible : {exc}"
     webrtc_process = proc
     webrtc_started_at = time.time()
+    if _win_assign_to_job(proc.pid):
+        webrtc_append_log("--- rattache au job Windows (mourra avec SyncVid) ---")
     asyncio.create_task(_webrtc_log_reader(proc))
     return True, "Serveur WebRTC demarre"
 
@@ -860,6 +950,44 @@ async def webrtc_restart(request: Request) -> JSONResponse:
     await stop_webrtc()
     await asyncio.sleep(0.6)
     return await webrtc_start(request)
+
+
+# --------- Arrêt propre des processus enfants ---------
+
+def _kill_child_sync(proc: Optional[asyncio.subprocess.Process]) -> None:
+    """Synchronous last-resort kill, for exit paths that never reach the
+    ASGI shutdown event (hard interpreter exit, unhandled crash)."""
+    if proc is None or proc.returncode is not None:
+        return
+    try:
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                capture_output=True, creationflags=NO_WINDOW, timeout=5,
+            )
+        else:
+            os.killpg(os.getpgid(proc.pid), 9)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
+def _cleanup_children_at_exit() -> None:
+    _kill_child_sync(webrtc_process)
+    _kill_child_sync(rtmp_process)
+
+
+atexit.register(_cleanup_children_at_exit)
+
+
+@fastapi_app.on_event("shutdown")
+async def _shutdown_children() -> None:
+    """Closing SyncVid used to leave the WebRTC server (and ffmpeg) running:
+    both are separate processes and nothing ever reaped them."""
+    await stop_webrtc()
+    await stop_rtmp_transcode()
 
 
 # --------- API DMX control endpoints ---------
