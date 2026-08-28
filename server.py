@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 from collections import deque
@@ -124,6 +125,12 @@ def _to_int(value: Any) -> Optional[int]:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+# Windows opens a console window for every child process unless told otherwise.
+# server.js passed windowsHide for ffmpeg; the Python port had dropped it, so
+# both ffmpeg and the WebRTC server flashed a blank terminal.
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
 VALID_SUBSCREEN_SHAPES = {"rect", "circle", "triangle", "polygon"}
@@ -305,6 +312,7 @@ async def start_rtmp_transcode(url: str, listen_mode: bool = True) -> None:
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.PIPE,
+        creationflags=NO_WINDOW,
     )
     rtmp_process = proc
     asyncio.create_task(_rtmp_log_reader(proc))
@@ -628,12 +636,27 @@ webrtc_options: dict[str, Any] = {
 def webrtc_python() -> Optional[str]:
     """Interpreter to run whep_server.py with.
 
-    Frozen builds must not re-launch themselves, so fall back to a python on
-    PATH; if there is none, supervision is simply unavailable.
+    Prefer pythonw.exe: python.exe is a console binary and Windows attaches a
+    console to it even with CREATE_NO_WINDOW, which pops an empty terminal in
+    the operator's face. pythonw.exe is a GUI-subsystem build and never does.
+    Frozen builds must not re-launch themselves, so they look on PATH instead.
     """
+    candidates: list[Optional[str]] = []
     if not IS_FROZEN:
-        return sys.executable
-    return shutil.which("python") or shutil.which("py")
+        exe = Path(sys.executable)
+        if sys.platform == "win32":
+            # pythonw sitting next to the running interpreter is the same build.
+            candidates.append(str(exe.with_name(exe.name.replace("python", "pythonw", 1))))
+            candidates.append(str(exe.with_name("pythonw.exe")))
+        candidates.append(sys.executable)
+    if sys.platform == "win32":
+        candidates.append(shutil.which("pythonw"))
+    candidates.extend([shutil.which("python"), shutil.which("py")])
+
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            return candidate
+    return None
 
 
 def webrtc_append_log(line: str) -> None:
@@ -707,6 +730,7 @@ async def start_webrtc() -> tuple[bool, str]:
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
+            creationflags=NO_WINDOW,
         )
     except OSError as exc:
         return False, f"Lancement impossible : {exc}"
@@ -727,6 +751,7 @@ async def kill_process_tree(pid: int) -> None:
             *cmd,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
+            creationflags=NO_WINDOW,
         )
         await proc.wait()
     except (OSError, FileNotFoundError):
