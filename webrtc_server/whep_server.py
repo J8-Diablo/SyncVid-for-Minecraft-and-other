@@ -127,6 +127,33 @@ class _PassthroughH264Decoder:
         return [pkt]
 
 
+# ── PassthroughOpusDecoder ────────────────────────────────────────────────────
+import aiortc.codecs.opus as _opus_mod
+
+
+class _PassthroughOpusDecoder:
+    """
+    Return Opus payloads as av.Packet instead of decoding them to PCM.
+
+    Without this, audio takes the decode -> re-encode path, and aiortc's
+    OpusEncoder is hardcoded to OPUS_APPLICATION_VOIP: a speech-tuned mode that
+    band-limits the signal and collapses music to something that sounds like
+    low-bitrate mono. It also never sets a target bitrate, so libopus picks its
+    conservative VoIP default.
+
+    OBS already sends Opus, so there is nothing to gain from re-encoding it.
+    RTCRtpSender routes non-Frame objects to OpusEncoder.pack(), which just
+    hands the payload back untouched — bit-exact passthrough of OBS's audio.
+    """
+
+    def decode(self, encoded_frame):
+        pkt = _av_mod.Packet(encoded_frame.data)
+        pkt.pts = encoded_frame.timestamp
+        pkt.dts = encoded_frame.timestamp
+        pkt.time_base = _opus_mod.TIME_BASE   # 1/48000
+        return [pkt]
+
+
 # Register for get_decoder("video/h264")
 _ac_mod.H264Decoder = _PassthroughH264Decoder
 
@@ -156,6 +183,8 @@ def _get_decoder_with_params(codec):
             if annex_b:
                 decoder._load_param_sets(annex_b)
         return decoder
+    if codec.mimeType.lower() == "audio/opus":
+        return _PassthroughOpusDecoder()
     return _orig_get_decoder(codec)
 
 _recv_mod.get_decoder = _get_decoder_with_params
@@ -178,6 +207,19 @@ class _LargeVideoJitterBuffer(_OrigJitterBuffer):
         super().__init__(capacity, prefetch, is_video)
 
 _recv_mod.JitterBuffer = _LargeVideoJitterBuffer
+
+# ── Patch 7: advertise stereo Opus ────────────────────────────────────────────
+# aiortc declares audio/opus with no fmtp parameters at all. RFC 7587 defaults
+# sprop-stereo to 0, so the answer effectively tells the browser "expect mono"
+# even when OBS is sending a stereo stream. Advertise stereo explicitly, plus
+# in-band FEC which costs nothing and helps on lossy links.
+for _codec in _ac_mod.CODECS.get("audio", []):
+    if _codec.mimeType.lower() == "audio/opus":
+        _codec.parameters.update({
+            "stereo": 1,
+            "sprop-stereo": 1,
+            "useinbandfec": 1,
+        })
 # ── End of patches ─────────────────────────────────────────────────────────────
 
 import argparse
