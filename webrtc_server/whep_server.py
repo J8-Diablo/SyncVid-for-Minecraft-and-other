@@ -276,6 +276,21 @@ logging.getLogger("aiohttp.server").addFilter(_SkipMalformedRequests())
 logging.getLogger("asyncio").addFilter(_SkipMalformedRequests())
 
 
+# The control panel polls /health and /debug/stats every couple of seconds. The
+# access log turns that into two lines every two seconds, which fills the
+# panel's own console buffer and evicts everything worth reading. Monitoring
+# endpoints don't belong in the access log.
+class _SkipPollingAccess(logging.Filter):
+    QUIET = ('"GET /health ', '"GET /debug/stats ')
+
+    def filter(self, record):
+        message = record.getMessage()
+        return not any(path in message for path in self.QUIET)
+
+
+LOG.addFilter(_SkipPollingAccess())
+
+
 # ── Codec helpers ─────────────────────────────────────────────────────────────
 def _best_codecs(kind: str, name: str):
     """Return codec list for setCodecPreferences, sorted by quality."""
