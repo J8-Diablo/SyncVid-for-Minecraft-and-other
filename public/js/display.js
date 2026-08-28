@@ -218,6 +218,51 @@ function applyLowLatencyPlayout(pc, tag) {
   console.log(`[whep:${tag}] low-latency playout:`, applied.length ? applied.join(', ') : 'NON SUPPORTE');
 }
 
+// Chrome offers Opus as "minptime=10;useinbandfec=1" — no stereo parameter.
+// RFC 7587 defaults `stereo` to 0, so that offer tells the sender "send me
+// mono" and the decoder downmixes on playback, however good the incoming
+// stream is. Getting stereo out of Chromium requires munging the offer.
+// sprop-stereo on the answer alone is not enough: `stereo` is the receiver's
+// request and it is the one that decides.
+function forceStereoOpus(sdp) {
+  const lines = sdp.split(/\r\n|\n/);
+  const opusPts = [];
+  lines.forEach(line => {
+    const m = /^a=rtpmap:(\d+)\s+opus\//i.exec(line);
+    if (m) opusPts.push(m[1]);
+  });
+  if (!opusPts.length) return sdp;
+
+  const withFmtp = new Set();
+  const out = [];
+  lines.forEach(line => {
+    const m = /^a=fmtp:(\d+)\s+(.*)$/.exec(line);
+    if (m && opusPts.indexOf(m[1]) !== -1) {
+      let params = m[2];
+      if (!/(^|;)\s*stereo=/.test(params)) params += ';stereo=1';
+      if (!/(^|;)\s*sprop-stereo=/.test(params)) params += ';sprop-stereo=1';
+      withFmtp.add(m[1]);
+      out.push(`a=fmtp:${m[1]} ${params}`);
+      return;
+    }
+    out.push(line);
+  });
+
+  // An Opus payload type with no fmtp line at all still needs one.
+  const final = [];
+  out.forEach(line => {
+    final.push(line);
+    const m = /^a=rtpmap:(\d+)\s+opus\//i.exec(line);
+    if (m && !withFmtp.has(m[1])) {
+      final.push(`a=fmtp:${m[1]} stereo=1;sprop-stereo=1;useinbandfec=1`);
+      withFmtp.add(m[1]);
+    }
+  });
+
+  console.log(`[whep] stereo Opus force pour les payloads ${opusPts.join(', ')}`);
+  return final.join('\r\n');
+}
+
 async function startWhepSession(url) {
   const videoEl = getVideoElement(slavePlayer);
   if (!videoEl) return;
@@ -240,6 +285,10 @@ async function startWhepSession(url) {
   videoEl.srcObject = mediaStream;
 
   const offer = await pc.createOffer();
+  // Munge BEFORE setLocalDescription: `stereo` lives in our own media section
+  // and it is what configures our decoder. Editing only the copy sent to the
+  // server would ask for stereo without being able to play it.
+  offer.sdp = forceStereoOpus(offer.sdp);
   await pc.setLocalDescription(offer);
   await waitForIceGatheringComplete(pc);
   const response = await fetch(url, {
@@ -367,7 +416,8 @@ function collectDisplayInfo() {
     bufferedEnd,
     quality,
     streamMode: activeStreamMode,
-    visibility: document.visibilityState
+    visibility: document.visibilityState,
+    whepAudio
   };
 }
 

@@ -131,6 +131,49 @@ class _PassthroughH264Decoder:
 import aiortc.codecs.opus as _opus_mod
 
 
+# Every Opus packet opens with a TOC byte:
+#   bits 3-7 config -> codec mode and audio bandwidth
+#   bit  2   stereo -> 0 = mono, 1 = stereo
+# The rtpmap always says opus/48000/2 (RFC 7587), so this byte is the only
+# place that actually says whether the stream carries two distinct channels.
+import collections as _collections
+
+OPUS_TOC_COUNTS: "_collections.Counter" = _collections.Counter()
+
+OPUS_CONFIG_NAMES = (
+    [("SILK", "bande etroite 4 kHz")] * 4
+    + [("SILK", "bande moyenne 6 kHz")] * 4
+    + [("SILK", "bande large 8 kHz")] * 4
+    + [("Hybride", "super-large 12 kHz")] * 2
+    + [("Hybride", "pleine bande 20 kHz")] * 2
+    + [("CELT", "bande etroite 4 kHz")] * 4
+    + [("CELT", "bande large 8 kHz")] * 4
+    + [("CELT", "super-large 12 kHz")] * 4
+    + [("CELT", "pleine bande 20 kHz")] * 4
+)
+
+
+def opus_toc_summary() -> dict:
+    total = sum(OPUS_TOC_COUNTS.values())
+    if not total:
+        return {"packets": 0}
+    modes = []
+    for (config, stereo), count in OPUS_TOC_COUNTS.most_common(6):
+        mode, band = (OPUS_CONFIG_NAMES[config]
+                      if config < len(OPUS_CONFIG_NAMES) else ("?", "?"))
+        modes.append({
+            "mode": mode, "bande": band,
+            "canaux": "stereo" if stereo else "mono",
+            "part_pct": round(count / total * 100, 1),
+        })
+    stereo_packets = sum(n for (_c, st), n in OPUS_TOC_COUNTS.items() if st)
+    return {
+        "packets": total,
+        "stereo_pct": round(stereo_packets / total * 100, 1),
+        "modes": modes,
+    }
+
+
 class _PassthroughOpusDecoder:
     """
     Return Opus payloads as av.Packet instead of decoding them to PCM.
@@ -147,7 +190,11 @@ class _PassthroughOpusDecoder:
     """
 
     def decode(self, encoded_frame):
-        pkt = _av_mod.Packet(encoded_frame.data)
+        data = encoded_frame.data
+        if data:
+            toc = data[0]
+            OPUS_TOC_COUNTS[(toc >> 3, bool((toc >> 2) & 1))] += 1
+        pkt = _av_mod.Packet(data)
         pkt.pts = encoded_frame.timestamp
         pkt.dts = encoded_frame.timestamp
         pkt.time_base = _opus_mod.TIME_BASE   # 1/48000
@@ -721,6 +768,7 @@ async def handle_debug_stats(request):
         "ingest_id":      ing.get("id"),
         "active_viewers": len(PCS),
         "ingest_active":  ing.get("pc") is not None,
+        "opus":           opus_toc_summary(),
     })
 
 

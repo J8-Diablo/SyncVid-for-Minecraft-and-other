@@ -103,6 +103,7 @@ rtmp_process: Optional[asyncio.subprocess.Process] = None
 rtmp_source_url: str = ""
 
 displays: dict[str, dict[str, Any]] = {}
+control_status: dict[str, Any] = {}
 
 api_config: dict[str, Any] = {"enabled": False, "token": ""}
 
@@ -432,6 +433,18 @@ fastapi_app.add_middleware(
     allow_headers=["Content-Type", "x-api-token", "Authorization"],
     allow_credentials=False,
 )
+
+
+# Pages are opened on many machines and edited often; a stale display.js is a
+# whole class of confusing bug. Revalidate scripts and styles on every load —
+# the cost is one conditional request, the payload still comes from cache when
+# unchanged.
+@fastapi_app.middleware("http")
+async def no_cache_for_code(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.endswith((".js", ".css", ".html")):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 # --------- Upload ---------
@@ -2319,6 +2332,14 @@ async def api_load_layout(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "frames": len(frames)})
 
 
+@fastapi_app.get("/displays")
+async def list_displays() -> JSONResponse:
+    """Live view of every connected display, including what each browser
+    reports about the stream it is decoding. Saves asking an operator to read
+    a browser console."""
+    return JSONResponse({"displays": list(displays.values()), "control": control_status})
+
+
 # --------- Pages ---------
 
 @fastapi_app.get("/")
@@ -2406,6 +2427,14 @@ async def on_register_display(sid: str, data: dict[str, Any]) -> None:
     }
     await sio.enter_room(sid, "displays")
     await sio.emit("updateDisplays", list(displays.values()), room="control")
+
+
+@sio.on("controlStatus")
+async def on_control_status(sid: str, data: dict[str, Any]) -> None:
+    if isinstance(data, dict):
+        control_status.update(data)
+        control_status["socketId"] = sid
+        control_status["lastSeen"] = int(time.time() * 1000)
 
 
 @sio.on("displayStatus")
