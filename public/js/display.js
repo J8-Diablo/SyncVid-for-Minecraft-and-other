@@ -85,6 +85,8 @@ function waitForIceGatheringComplete(pc) {
 
 let whepStats = null;
 let whepStatsPrevInbound = null;
+let whepStatsPrevAudio = null;
+let whepAudio = null;
 
 async function sampleWhepStats() {
   if (!whepSession || !whepSession.pc) {
@@ -100,13 +102,40 @@ async function sampleWhepStats() {
   }
   let inbound = null;
   let pair = null;
+  let audio = null;
   const candidates = {};
+  const codecs = {};
   report.forEach(s => {
     if (s.type === 'inbound-rtp' && s.kind === 'video') inbound = s;
+    if (s.type === 'inbound-rtp' && s.kind === 'audio') audio = s;
     if (s.type === 'candidate-pair' && s.nominated) pair = s;
     if (s.type === 'local-candidate' || s.type === 'remote-candidate') candidates[s.id] = s;
+    if (s.type === 'codec') codecs[s.id] = s;
   });
   if (!inbound) return;
+
+  // What the browser is actually decoding — the only place that settles a
+  // "the audio sounds wrong" question: codec, sample rate, channel count and
+  // the negotiated fmtp line.
+  const aCodec = audio && codecs[audio.codecId];
+  const prevA = whepStatsPrevAudio;
+  let aKbps = null;
+  if (audio && prevA && audio.timestamp > prevA.timestamp) {
+    aKbps = ((audio.bytesReceived - prevA.bytesReceived) * 8)
+      / ((audio.timestamp - prevA.timestamp) / 1000) / 1000;
+  }
+  whepAudio = audio ? {
+    codec: aCodec ? aCodec.mimeType : '?',
+    clockRate: aCodec ? aCodec.clockRate : null,
+    channels: aCodec ? aCodec.channels : null,
+    fmtp: aCodec ? (aCodec.sdpFmtpLine || '') : '',
+    kbps: aKbps,
+    lost: audio.packetsLost || 0,
+    received: audio.packetsReceived || 0,
+    concealed: audio.concealedSamples || 0,
+    level: audio.audioLevel != null ? audio.audioLevel : null,
+  } : null;
+  whepStatsPrevAudio = audio;
 
   const prev = whepStatsPrevInbound;
   let kbps = null;
@@ -148,6 +177,15 @@ function logWhepStats() {
     `pli=${s.pli}  nack=${s.nack}  trames_perdues=${s.dropped}  ` +
     `rtt=${s.rttMs != null ? s.rttMs.toFixed(0) : '?'}ms  ice=${s.iceLocal}`
   );
+  if (whepAudio) {
+    const a = whepAudio;
+    console.log(
+      `[whep:audio] ${a.codec} ${a.clockRate || '?'}Hz  ` +
+      `canaux=${a.channels != null ? a.channels : '?'}  ` +
+      `${a.kbps != null ? a.kbps.toFixed(0) : '?'}kbps  ` +
+      `fmtp="${a.fmtp}"  perdus=${a.lost}  masques=${a.concealed}`
+    );
+  }
 }
 
 // Chrome sizes its jitter buffer from the observed packet arrival jitter. A
@@ -522,6 +560,16 @@ function updateStatsOverlay() {
       `<b>RTT</b> ${s.rttMs != null ? s.rttMs.toFixed(0) : '?'} ms`,
       `<b>ICE</b> ${s.iceLocal}`
     );
+    if (whepAudio) {
+      const a = whepAudio;
+      const chColor = a.channels === 2 ? '#22c55e' : a.channels === 1 ? '#ef4444' : '#94a3b8';
+      lines.push(
+        `<b>AUDIO</b> ${a.codec} ${a.clockRate || '?'}Hz ` +
+        `<span style="color:${chColor};font-weight:700">${a.channels != null ? a.channels : '?'} canal(aux)</span>` +
+        ` ${a.kbps != null ? a.kbps.toFixed(0) : '?'} kbps`,
+        `<b>fmtp</b> ${a.fmtp || '(aucun)'}`
+      );
+    }
   }
   el.innerHTML = lines.join('<br>');
 }
