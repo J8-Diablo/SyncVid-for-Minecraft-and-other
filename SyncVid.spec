@@ -5,7 +5,15 @@ a = Analysis(
     ['gui.py'],
     pathex=[],
     binaries=[],
-    datas=[('public', 'public'), ('locales', 'locales')],
+    datas=[
+        ('public', 'public'),
+        ('locales', 'locales'),
+        # Le panneau « Serveur WebRTC » lance ce script dans un python
+        # du systeme ; il doit donc etre present a cote de l'exe.
+        ('webrtc_server/whep_server.py', 'webrtc_server'),
+        ('webrtc_server/requirements.txt', 'webrtc_server'),
+        ('webrtc_server/README.md', 'webrtc_server'),
+    ],
     hiddenimports=[
         'engineio.async_drivers.asgi',
         'uvicorn.logging',
