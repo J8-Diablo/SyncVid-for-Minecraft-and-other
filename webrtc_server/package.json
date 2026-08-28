@@ -1,0 +1,12 @@
+{
+  "name": "syncvid-rtmp-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal RTMP server for SyncVid (node-media-server).",
+  "scripts": {
+    "rtmp": "node rtmp_server.js"
+  },
+  "dependencies": {
+    "node-media-server": "^4.0.12"
+  }
+}

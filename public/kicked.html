@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Disconnected</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at top, #111827 0, #020617 55%);
+      color: #e5e7eb;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .panel {
+      text-align: center;
+      padding: 32px 40px;
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.75);
+      box-shadow: 0 0 60px rgba(239, 68, 68, 0.18);
+      max-width: 520px;
+    }
+    .icon {
+      font-size: 60px;
+      line-height: 1;
+      margin-bottom: 16px;
+      color: #fecaca;
+      text-shadow: 0 0 24px rgba(239, 68, 68, 0.5);
+    }
+    h1 {
+      font-size: 22px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin: 0 0 8px;
+    }
+    p {
+      color: #94a3b8;
+      margin: 0 0 24px;
+      font-size: 14px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 8px 18px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.6);
+      color: #e5e7eb;
+      text-decoration: none;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      transition: background 120ms ease;
+    }
+    .btn:hover { background: rgba(59, 130, 246, 0.3); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="icon">⏻</div>
+    <h1 data-fr="Ecran deconnecte" data-en="Display disconnected">Display disconnected</h1>
+    <p data-fr="Cet ecran a ete deconnecte par le panneau de controle."
+       data-en="This display was kicked from the control panel.">
+      This display was kicked from the control panel.
+    </p>
+    <a class="btn" href="javascript:window.close()" data-fr="Fermer la fenetre" data-en="Close window">Close window</a>
+  </div>
+  <script>
+    (function () {
+      var lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+      if (lang === 'fr') {
+        document.querySelectorAll('[data-fr]').forEach(function (el) {
+          el.textContent = el.getAttribute('data-fr');
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

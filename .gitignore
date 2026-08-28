@@ -1,9 +1,50 @@
-# ignore ALL .webm files
+# ---------------------------------------------------------------------------
+# Médias
+# ---------------------------------------------------------------------------
 *.webm
+uploads/
+public/streams/
+streams/
 
-# ignore node_modules
+# ---------------------------------------------------------------------------
+# Dépendances
+# ---------------------------------------------------------------------------
 node_modules/
 package-lock.json
+.venv/
+venv/
 
-# ignore .txt files
-*.txt
+# ---------------------------------------------------------------------------
+# Artefacts de build (PyInstaller + pkg)
+# ---------------------------------------------------------------------------
+build/
+build-webview/
+dist/
+dist-webview/
+*.egg-info/
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+
+# ---------------------------------------------------------------------------
+# Données locales et générées à l'exécution
+# ---------------------------------------------------------------------------
+# Captures caméra des calibrations : volumineuses et elles montrent la pièce.
+debug/
+# Layouts et configuration appartiennent à l'installation, pas au dépôt.
+layouts/
+config/
+
+# ---------------------------------------------------------------------------
+# Divers
+# ---------------------------------------------------------------------------
+.claude/
+*.log
+Thumbs.db
+.DS_Store
+
+# Note : les motifs de calibration (public/calibration-*.png) sont versionnés
+# exprès — le build WebView2 n'embarque pas OpenCV et ne peut pas les régénérer.

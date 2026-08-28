@@ -81,6 +81,21 @@
     </div>
   </nav>
   <div class="container app-main">
+    <ul class="nav nav-tabs app-tabs" id="mainTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tabBtnControl" data-bs-toggle="tab" data-bs-target="#tabControl"
+                type="button" role="tab" data-i18n="tabs.control">Contrôle</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tabBtnWebrtc" data-bs-toggle="tab" data-bs-target="#tabWebrtc"
+                type="button" role="tab">
+          <span data-i18n="tabs.webrtc">Serveur WebRTC</span>
+          <span class="webrtc-dot" id="webrtcTabDot" title=""></span>
+        </button>
+      </li>
+    </ul>
+    <div class="tab-content">
+    <div class="tab-pane fade show active" id="tabControl" role="tabpanel">
     <div class="row g-4">
 
       <div class="col-md-8">
@@ -89,9 +104,15 @@
             <video id="masterVideo" class="video-js vjs-default-skin" controls playsinline preload="auto"></video>
           </div>
           <div class="layout-actions-bar">
-            <button id="btnSaveLayout" class="btn btn-outline-light" data-i18n="layout.save">Sauvegarder layout</button>
-            <button id="btnImportLayout" class="btn btn-outline-light" data-i18n="layout.import">Importer layout</button>
-            <input type="file" id="layoutImportInput" accept="application/json" class="d-none">
+            <div class="layout-actions-left">
+              <button id="btnPlayPause" class="btn btn-primary" data-i18n="controls.play">Play</button>
+              <button id="btnResync" class="btn btn-outline-light" data-i18n="controls.resync">Resync</button>
+            </div>
+            <div class="layout-actions-right">
+              <button id="btnSaveLayout" class="btn btn-outline-light" data-i18n="layout.save">Sauvegarder layout</button>
+              <button id="btnImportLayout" class="btn btn-outline-light" data-i18n="layout.import">Importer layout</button>
+              <input type="file" id="layoutImportInput" accept="application/json" class="d-none">
+            </div>
           </div>
         </div>
         <div class="app-panel">
@@ -102,6 +123,18 @@
       <div class="col-md-4">
         <div class="app-panel">
           <h5 data-i18n="listvideo">Liste des vidéos</h5>
+          <div class="stream-input">
+            <label class="form-label" for="streamUrlInput" data-i18n="stream.title">Stream URL</label>
+            <div class="stream-row">
+              <select class="form-select form-select-sm" id="streamType">
+                <option value="auto" data-i18n="stream.typeAuto">Auto</option>
+                <option value="whep" data-i18n="stream.typeWhep">WebRTC (WHEP)</option>
+                <option value="rtmp" data-i18n="stream.typeRtmp">RTMP</option>
+              </select>
+              <input type="text" class="form-control" id="streamUrlInput" data-i18n="stream.urlPlaceholder" data-i18n-attr="placeholder" placeholder="srt://host:port or https://.../stream.m3u8">
+              <button class="btn btn-outline-light" type="button" id="btnLoadStream" data-i18n="stream.load">Load</button>
+            </div>
+          </div>
           <ul id="videoList" class="list-group scroll-list"></ul>
         </div>
         <div class="app-panel">
@@ -109,6 +142,73 @@
           <ul id="displayList" class="list-group scroll-list"></ul>
         </div>
       </div>
+    </div>
+    </div>
+
+    <div class="tab-pane fade" id="tabWebrtc" role="tabpanel">
+      <div class="app-panel webrtc-head">
+        <div class="webrtc-state">
+          <span class="webrtc-badge" id="webrtcBadge">—</span>
+          <span class="webrtc-meta" id="webrtcMeta"></span>
+        </div>
+        <div class="webrtc-actions">
+          <button class="btn btn-sm btn-success" id="webrtcStart" data-i18n="webrtc.start">Démarrer</button>
+          <button class="btn btn-sm btn-danger" id="webrtcStop" data-i18n="webrtc.stop">Arrêter</button>
+          <button class="btn btn-sm btn-outline-light" id="webrtcRestart" data-i18n="webrtc.restart">Redémarrer</button>
+        </div>
+      </div>
+
+      <div class="app-panel">
+        <h5 data-i18n="webrtc.options">Options de lancement</h5>
+        <div class="webrtc-options">
+          <label class="webrtc-field">
+            <span data-i18n="webrtc.videoBitrate">Débit vidéo (kbps)</span>
+            <input type="number" class="form-control form-control-sm" id="webrtcVideoBitrate" min="500" max="60000" step="500" value="15000">
+          </label>
+          <label class="webrtc-field">
+            <span data-i18n="webrtc.audioBitrate">Débit audio (kbps)</span>
+            <input type="number" class="form-control form-control-sm" id="webrtcAudioBitrate" min="32" max="512" step="16" value="192">
+          </label>
+          <label class="webrtc-field">
+            <span data-i18n="webrtc.codec">Codec vidéo</span>
+            <select class="form-select form-select-sm" id="webrtcCodec">
+              <option value="h264">H.264</option>
+              <option value="vp8">VP8</option>
+              <option value="auto">Auto</option>
+            </select>
+          </label>
+          <label class="webrtc-field webrtc-field-check">
+            <input class="form-check-input" type="checkbox" id="webrtcVerbose">
+            <span data-i18n="webrtc.verbose">Logs détaillés (volumineux)</span>
+          </label>
+        </div>
+        <div class="webrtc-urls">
+          <span><b>WHIP</b> <code id="webrtcWhipUrl">—</code></span>
+          <span><b>WHEP</b> <code id="webrtcWhepUrl">—</code></span>
+        </div>
+      </div>
+
+      <div class="app-panel">
+        <h5 data-i18n="webrtc.stats">Statistiques</h5>
+        <div id="webrtcStats" class="webrtc-stats">
+          <div class="webrtc-empty" data-i18n="webrtc.noStats">Serveur injoignable.</div>
+        </div>
+      </div>
+
+      <div class="app-panel">
+        <div class="webrtc-console-head">
+          <h5 class="mb-0" data-i18n="webrtc.console">Console</h5>
+          <div class="webrtc-console-actions">
+            <label class="webrtc-field-check mb-0">
+              <input class="form-check-input" type="checkbox" id="webrtcAutoscroll" checked>
+              <span data-i18n="webrtc.autoscroll">Défilement auto</span>
+            </label>
+            <button class="btn btn-sm btn-outline-light" id="webrtcClearLog" data-i18n="webrtc.clear">Vider</button>
+          </div>
+        </div>
+        <pre id="webrtcConsole" class="webrtc-console"></pre>
+      </div>
+    </div>
     </div>
   </div>
   <footer class="container d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top app-footer">
@@ -120,7 +220,7 @@
                 <img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-nc-sa.svg" alt="CC BY-NC-SA 4.0" height="40">
               </a>
         </li>
-        <li class="mb-3 mb-md-0 text-body-secondary" data-i18n="footer.version">Version 2.0.0</li>
+        <li class="mb-3 mb-md-0 text-body-secondary" data-i18n="footer.version">Version 4.0.0</li>
       </ul>
     </div>
     <ul class="nav col-md-4 justify-content-end list-unstyled d-flex">
@@ -128,6 +228,86 @@
       <li class="ms-3"><a class="text-body-secondary" href="https://www.twitch.tv/J_diablo" aria-label="Facebook">Twitch</a></li>
     </ul>
   </footer>
+
+  <div class="modal fade" id="calibrateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content app-modal">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <span data-i18n="calibrate.modalTitle">Auto-calibrate sub-screens</span>
+            <span id="calibrateModalLabel" class="ms-2 text-body-secondary"></span>
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <ol class="small text-body-secondary mb-3" data-i18n="calibrate.steps">
+            <li>Pointez la camera vers le panneau (tous les ecrans physiques dans le cadre).</li>
+            <li>Demarrez la camera, puis cliquez "Lancer". L'app affiche une grille ArUco puis une sequence blanc / rouge / vert / bleu.</li>
+            <li>L'app determine seule la geometrie via homographie + detection des contours et sauvegarde le layout.</li>
+          </ol>
+          <div class="calib-row mb-2">
+            <select id="calibCameraSelect" class="form-select form-select-sm" style="max-width:280px;"></select>
+            <button type="button" class="btn btn-sm btn-outline-light" id="calibStartCamera" data-i18n="calibrate.startCamera">Start camera</button>
+            <button type="button" class="btn btn-sm btn-primary" id="calibRun" data-i18n="calibrate.run" disabled>Run calibration</button>
+            <label class="form-check d-flex align-items-center gap-1 mb-0 ms-2" style="font-size:12px;">
+              <input type="checkbox" class="form-check-input" id="calibAppendMode">
+              <span data-i18n="calibrate.appendMode">Append (keep existing)</span>
+            </label>
+          </div>
+          <div class="progress mb-2" style="height: 6px;">
+            <div id="calibProgressBar" class="progress-bar" role="progressbar" style="width:0%; background: linear-gradient(90deg, #22c55e, #3b82f6);"></div>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="calib-status text-body-secondary small" id="calibStatus"></div>
+            <a id="calibDebugLink" class="btn btn-sm btn-outline-light" target="_blank" rel="noopener" style="display:none;" data-i18n="calibrate.viewDebug">View debug captures</a>
+          </div>
+          <div class="calib-stage">
+            <video id="calibVideo" autoplay playsinline muted></video>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal" data-i18n="common.close">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="subScreensModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content app-modal">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <span data-i18n="subscreen.modalTitle">Sub-screens</span>
+            <span id="subScreensModalLabel" class="ms-2 text-body-secondary"></span>
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="subscreen-actions mb-2 d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-sm btn-outline-light" data-add-shape="rect" data-i18n="subscreen.addRect">+ Rect</button>
+            <button type="button" class="btn btn-sm btn-outline-light" data-add-shape="circle" data-i18n="subscreen.addCircle">+ Circle</button>
+            <button type="button" class="btn btn-sm btn-outline-light" data-add-shape="triangle" data-i18n="subscreen.addTriangle">+ Triangle</button>
+            <button type="button" class="btn btn-sm btn-outline-light" data-add-shape="polygon" data-i18n="subscreen.addPolygon">+ Polygon</button>
+            <button type="button" class="btn btn-sm btn-primary" id="subScreenAutoCalibrateBtn" data-i18n="subscreen.autoCalibrate">Auto-calibrate</button>
+            <div class="form-check form-switch mb-0 ms-2">
+              <input class="form-check-input" type="checkbox" id="subScreenIdentifyToggle">
+              <label class="form-check-label text-body-secondary small" for="subScreenIdentifyToggle" data-i18n="subscreen.identify">Identify mode</label>
+            </div>
+          </div>
+          <div class="subscreen-canvas-wrap mb-3">
+            <svg id="subScreenCanvas" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+            <div class="subscreen-canvas-hint text-body-secondary small">
+              <span data-i18n="subscreen.canvasHint">Click a sub-screen to select. Drag to move. Polygon vertices are draggable; right-click a vertex to delete; click an edge to insert.</span>
+            </div>
+          </div>
+          <ul id="subScreenList" class="list-group scroll-list"></ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal" data-i18n="common.close">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="modal fade" id="apiConfigModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -176,5 +356,7 @@
   <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
   <script src="/vendor/socket.io.min.js"></script>
   <script src="/js/control.js"></script>
+  <script src="/js/webrtc-panel.js"></script>
 </body>
 </html>
+

@@ -11,10 +11,115 @@
     html, body { margin:0; padding:0; width:100vw; height:100vh; overflow:hidden; background:black; }
     .video-js { position:absolute; top:0; left:0; width:100%!important; height:100%!important; }
     .video-js .vjs-tech { object-fit: fill!important; width:100%!important; height:100%!important; }
+
+    #subScreenOverlays {
+      position: fixed; inset: 0; pointer-events: none; z-index: 10;
+    }
+    #subScreenOverlays .sub-screen {
+      position: absolute;
+      overflow: hidden;
+    }
+    #subScreenOverlays .sub-screen .tint {
+      position: absolute; inset: 0;
+      mix-blend-mode: multiply;
+    }
+    #subScreenOverlays .sub-screen .dim {
+      position: absolute; inset: 0;
+      background: #000;
+    }
+    #subScreenOverlays .sub-screen .ident {
+      position: absolute; inset: 0;
+      display: none;
+      z-index: 2;
+    }
+    #subScreenOverlays .sub-screen .ident-label {
+      position: absolute; inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font: 900 14vmin/1 "Segoe UI", system-ui, sans-serif;
+      color: #fff;
+      text-shadow:
+        -2px -2px 0 #000, 2px -2px 0 #000,
+        -2px  2px 0 #000, 2px  2px 0 #000,
+        0 0 16px rgba(0,0,0,0.9);
+      z-index: 3;
+      pointer-events: none;
+    }
+    /* Black mask that hides the video everywhere except inside sub-screens.
+       Built as a single CSS clip-path on this layer when sub-screens exist. */
+    #panelMask {
+      position: fixed; inset: 0; background: #000;
+      pointer-events: none; z-index: 5;
+      display: none;
+    }
+    #panelMask.active { display: block; }
+    #outlineLayer {
+      position: fixed; inset: 0; pointer-events: none; z-index: 11;
+      display: none;
+    }
+    #outlineLayer.active { display: block; }
+    #outlineLayer .outline {
+      fill: none;
+      stroke: #22d3ee;
+      stroke-width: 2;
+      filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.6));
+    }
+    #outlineLayer .outline-label {
+      fill: #22d3ee;
+      stroke: #000;
+      stroke-width: 4;
+      paint-order: stroke fill;
+      font: 700 16px ui-monospace, "Cascadia Mono", monospace;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    #identifyOverlay {
+      position: fixed; inset: 0; z-index: 9998;
+      background: rgba(34, 197, 94, 0.0);
+      display: none; pointer-events: none;
+      align-items: center; justify-content: center;
+      color: #fff; font: 700 18vw/1 "Segoe UI", sans-serif;
+      text-shadow: 0 0 30px rgba(34, 197, 94, 0.9);
+    }
+    #identifyOverlay.show { display: flex; animation: identifyPulse 2.4s ease-out forwards; }
+    @keyframes identifyPulse {
+      0%   { background: rgba(34, 197, 94, 0.0);  transform: scale(0.85); opacity: 0; }
+      15%  { background: rgba(34, 197, 94, 0.55); transform: scale(1.0);  opacity: 1; }
+      45%  { background: rgba(34, 197, 94, 0.25); }
+      70%  { background: rgba(34, 197, 94, 0.45); }
+      100% { background: rgba(34, 197, 94, 0.0);  opacity: 0; transform: scale(1.1); }
+    }
+
+    #statsOverlay {
+      position: fixed; top: 8px; left: 8px; z-index: 9999;
+      background: rgba(2, 6, 23, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      color: #e5e7eb;
+      font: 12px/1.4 ui-monospace, "Cascadia Mono", "Consolas", monospace;
+      padding: 8px 10px; border-radius: 8px;
+      pointer-events: none;
+      display: none; min-width: 200px;
+      backdrop-filter: blur(6px);
+    }
+    #statsOverlay.show { display: block; }
+    #statsOverlay b { color: #60a5fa; }
   </style>
 </head>
 <body>
   <video id="slaveVideo" class="video-js vjs-default-skin" autoplay muted preload="auto"></video>
+  <div id="panelMask"></div>
+  <div id="subScreenOverlays"></div>
+  <svg id="outlineLayer" xmlns="http://www.w3.org/2000/svg"></svg>
+  <svg id="subScreenSvg" width="0" height="0" style="position:fixed; left:-9999px; top:-9999px;">
+    <defs>
+      <clipPath id="panelClip" clipPathUnits="userSpaceOnUse"></clipPath>
+      <mask id="panelHoleMask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse"></mask>
+    </defs>
+  </svg>
+  <div id="identifyOverlay"></div>
+  <div id="statsOverlay"></div>
   <script src="https://vjs.zencdn.net/8.5.2/video.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/vendor/socket.io.min.js"></script>
