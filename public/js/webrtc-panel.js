@@ -194,7 +194,14 @@
     if (!auto || auto.checked) pre.scrollTop = pre.scrollHeight;
   }
 
+  // The interval and the post-action refresh can overlap. Two polls reading the
+  // same logCursor both fetch the same slice and append it twice, which showed
+  // up as a duplicated startup banner in the console.
+  let polling = false;
+
   async function poll() {
+    if (polling) return;
+    polling = true;
     try {
       const status = await fetch('/webrtc/status').then(r => r.json());
       renderStatus(status);
@@ -217,6 +224,8 @@
       logCursor = logs.next || logCursor;
     } catch (err) {
       console.error('[webrtc-panel]', err);
+    } finally {
+      polling = false;
     }
   }
 

@@ -254,6 +254,28 @@ class _SkipApipa(logging.Filter):
 logging.getLogger("aioice.ice").addFilter(_SkipApipa())
 
 
+# ── Quieten garbage traffic ──────────────────────────────────────────────────
+# Anything speaking TLS to this plain-HTTP port (a browser trying https://, a
+# port scanner) makes aiohttp log a full traceback for an unparseable request
+# line. Exposed on the internet that floods the console and buries the useful
+# lines. The 400 access-log entry still records it.
+class _SkipMalformedRequests(logging.Filter):
+    # The traceback lives in record.exc_info, not in the message — the message
+    # is only "Error handling request" — so both have to be inspected.
+    NOISE = ("BadStatusLine", "Invalid method encountered",
+             "ConnectionResetError", "BadHttpMessage")
+
+    def filter(self, record):
+        blob = record.getMessage()
+        if record.exc_info and record.exc_info[1] is not None:
+            blob += " " + repr(record.exc_info[1])
+        return not any(pattern in blob for pattern in self.NOISE)
+
+
+logging.getLogger("aiohttp.server").addFilter(_SkipMalformedRequests())
+logging.getLogger("asyncio").addFilter(_SkipMalformedRequests())
+
+
 # ── Codec helpers ─────────────────────────────────────────────────────────────
 def _best_codecs(kind: str, name: str):
     """Return codec list for setCodecPreferences, sorted by quality."""

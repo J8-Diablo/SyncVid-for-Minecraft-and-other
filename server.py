@@ -627,6 +627,7 @@ webrtc_process: Optional[asyncio.subprocess.Process] = None
 webrtc_log: deque[str] = deque(maxlen=WEBRTC_LOG_LINES)
 webrtc_log_seq: int = 0          # total lines ever emitted, for incremental fetch
 webrtc_started_at: Optional[float] = None
+webrtc_stopping: bool = False
 webrtc_options: dict[str, Any] = {
     "videoBitrate": 15000,
     "audioBitrate": 192,
@@ -764,7 +765,10 @@ async def _webrtc_log_reader(proc: asyncio.subprocess.Process) -> None:
         if text:
             webrtc_append_log(text)
     code = await proc.wait()
-    webrtc_append_log(f"--- processus termine (code {code}) ---")
+    if webrtc_stopping:
+        webrtc_append_log("--- processus termine ---")
+    else:
+        webrtc_append_log(f"--- processus termine de facon inattendue (code {code}) ---")
 
 
 def webrtc_build_args() -> list[str]:
@@ -859,9 +863,12 @@ async def stop_webrtc() -> tuple[bool, str]:
         webrtc_process = None
         webrtc_started_at = None
         return False, "Aucun serveur WebRTC lance depuis l'application"
+    global webrtc_stopping
     proc = webrtc_process
     webrtc_process = None
     webrtc_started_at = None
+    webrtc_stopping = True
+    webrtc_append_log("--- arret demande depuis le panneau de controle ---")
     try:
         proc.terminate()
     except ProcessLookupError:
@@ -876,7 +883,7 @@ async def stop_webrtc() -> tuple[bool, str]:
             await asyncio.wait_for(proc.wait(), timeout=3)
         except asyncio.TimeoutError:
             pass
-    webrtc_append_log("--- arrete depuis le panneau de controle ---")
+    webrtc_stopping = False
     return True, "Serveur WebRTC arrete"
 
 
